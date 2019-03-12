@@ -20,6 +20,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
+LD_FLAGS ?= -lboost_system -loptparse
 
 # Sources which define main functions
 MAIN_SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp)
@@ -61,25 +62,25 @@ $(OBJ_DIR_RELEASE_MPI)/%.cpp.o: %.cpp
 ENGINE_RELEASE_OBJS := $(SUB_OBJS_RELEASE_MPI) $(OBJ_DIR_RELEASE_MPI)/src/engine.cpp.o
 engine-release: $(ENGINE_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_RELEASE))
-	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) -loptparse
+	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) $(LD_FLAGS)
 
 # Engine debug target
 ENGINE_DEBUG_OBJS := $(SUB_OBJS_DEBUG_MPI) $(OBJ_DIR_DEBUG_MPI)/src/engine.cpp.o
 engine-debug: $(ENGINE_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_DEBUG))
-	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) -loptparse
+	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) $(LD_FLAGS)
 
 # Viewer release target
 VIEWER_RELEASE_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_RELEASE)/src/viewer.cpp.o
 viewer-release: $(VIEWER_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_RELEASE))
-	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) -loptparse -lgltools -lGLEW -lglfw -lGL
+	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS) -lgltools -lGLEW -lglfw -lGL
 
 # Viewer debug target
 VIEWER_DEBUG_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_DEBUG)/src/viewer.cpp.o
 viewer-debug: $(VIEWER_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_DEBUG))
-	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) -loptparse -lgltools -lGLEW -lglfw -lGL
+	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS) -lgltools -lGLEW -lglfw -lGL
 
 # Make all targets
 release: engine-release viewer-release

@@ -1,26 +1,26 @@
 #ifndef _MPIGRAV_BODY_INCLUDED
 #define _MPIGRAV_BODY_INCLUDED
 
-
 #include <string>
-#include "Vec3.hpp"
 #include <math.h>
 
+#include "Master.hpp"
+#include <util/Vec3.hpp>
 
-template<class T>
+
 class Body {
   public:
-    Vec3<T> pos;    // Position, meters
-    Vec3<T> v;      // Velocity, meters per second
-    T m;            // Mass, kilograms
+    Vec3 pos;      // Position, meters
+    Vec3 v;        // Velocity, meters per second
+    fp_t m;              // Mass, kilograms
 
   public:
     Body(void) : m(1) {}
-    Body(Vec3<T> const pos, T const mass) : pos(pos), m(mass) {}
+    Body(Vec3 const pos, fp_t const mass) : pos(pos), m(mass) {}
 
     // Applies veolocity with given timestep
-    inline void Update(T const dt) {this->pos = this->pos + (v * dt);}
-    inline Vec3<T> Force(Body<T> const& other);
+    inline void Update(fp_t const dt) {this->pos = this->pos + (v * dt);}
+    inline Vec3 Force(Body const& other);
 
     std::string Str(void) {
       std::stringstream ss;

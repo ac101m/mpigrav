@@ -1,9 +1,0 @@
-#include <Body.hpp>
-
-
-#include <sstream>
-
-
-// Get the body as a string
-template<class T>
-std::string Body<T>::Str(void)
