@@ -20,7 +20,8 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
-LD_FLAGS ?= -lboost_system -loptparse -lgltools  -lGLEW -lglfw -lGL
+LD_FLAGS_SERVER ?= -lboost_system -loptparse
+LD_FLAGS_CLIENT ?= -lboost_system -loptparse -lgltools -lGLEW -lglfw -lGL
 
 # Sources which define main functions
 MAIN_SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp)
@@ -32,10 +33,11 @@ MAIN_DEPS := $(MAIN_OBJS_DEBUG:.o=.d) $(SUB_OBJS_RELEASE:.o=.d)
 
 # "Subordinate" sources which do not define mains
 SUB_SRCS := $(shell find $(SRC_DIRS) -mindepth 2 -name *.cpp)
+SUB_SRCS_NOGFX := $(shell find $(SRC_DIRS) -mindepth 2 -name *.cpp | grep -v /draw/)
 SUB_OBJS_RELEASE := $(SUB_SRCS:%=$(OBJ_DIR_RELEASE)/%.o)
 SUB_OBJS_DEBUG := $(SUB_SRCS:%=$(OBJ_DIR_DEBUG)/%.o)
-SUB_OBJS_RELEASE_MPI := $(SUB_SRCS:%=$(OBJ_DIR_RELEASE_MPI)/%.o)
-SUB_OBJS_DEBUG_MPI := $(SUB_SRCS:%=$(OBJ_DIR_DEBUG_MPI)/%.o)
+SUB_OBJS_RELEASE_MPI := $(SUB_SRCS_NOGFX:%=$(OBJ_DIR_RELEASE_MPI)/%.o)
+SUB_OBJS_DEBUG_MPI := $(SUB_SRCS_NOGFX:%=$(OBJ_DIR_DEBUG_MPI)/%.o)
 SUB_DEPS := $(SUB_OBJS_DEBUG:.o=.d) $(SUB_OBJS_RELEASE:.o=.d)
 
 # Release object compilation g++
@@ -60,27 +62,27 @@ $(OBJ_DIR_RELEASE_MPI)/%.cpp.o: %.cpp
 
 # Engine release build target
 ENGINE_RELEASE_OBJS := $(SUB_OBJS_RELEASE_MPI) $(OBJ_DIR_RELEASE_MPI)/src/engine.cpp.o
-engine-release: $(ENGINE_RELEASE_OBJS)
+server_release: $(ENGINE_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_RELEASE))
-	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) $(LD_FLAGS)
+	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) $(LD_FLAGS_SERVER)
 
 # Engine debug target
 ENGINE_DEBUG_OBJS := $(SUB_OBJS_DEBUG_MPI) $(OBJ_DIR_DEBUG_MPI)/src/engine.cpp.o
-engine-debug: $(ENGINE_DEBUG_OBJS)
+server_debug: $(ENGINE_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_DEBUG))
-	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) $(LD_FLAGS)
+	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) $(LD_FLAGS_SERVER)
 
 # Viewer release target
 VIEWER_RELEASE_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_RELEASE)/src/viewer.cpp.o
-viewer-release: move_shaders $(VIEWER_RELEASE_OBJS)
+client_release: move_shaders $(VIEWER_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_RELEASE))
-	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS)
+	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS_CLIENT)
 
 # Viewer debug target
 VIEWER_DEBUG_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_DEBUG)/src/viewer.cpp.o
-viewer-debug: move_shaders $(VIEWER_DEBUG_OBJS)
+client_debug: move_shaders $(VIEWER_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_DEBUG))
-	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS)
+	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS_CLIENT)
 
 # Simple target, collect glsl files in the shaders folder
 GLSL_SRCS := $(shell find $(SRC_DIRS) -name *.glsl)
@@ -90,8 +92,8 @@ move_shaders:
 	cp $(GLSL_SRCS) $(SHADER_BIN_DIR)
 
 # Make all targets
-release: engine-release viewer-release
-debug: engine-debug viewer-debug
+release: client_release server_release
+debug: client_debug server_debug
 all: release debug
 
 # Clean, be careful with this
