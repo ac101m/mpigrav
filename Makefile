@@ -1,8 +1,8 @@
 # Release targets
-TARGET_ENGINE_RELEASE ?= bin/mpigrav
-TARGET_ENGINE_DEBUG ?= bin/mpigrav-debug
-TARGET_VIEWER_RELEASE ?= bin/mpigrav-viewer
-TARGET_VIEWER_DEBUG ?= bin/mpigrav-viewer-debug
+TARGET_ENGINE_RELEASE ?= bin/mpigrav-server
+TARGET_ENGINE_DEBUG ?= bin/mpigrav-server-debug
+TARGET_VIEWER_RELEASE ?= bin/mpigrav-client
+TARGET_VIEWER_DEBUG ?= bin/mpigrav-client-debug
 
 # Directory controls
 OBJ_DIR_BASE ?= build
@@ -61,25 +61,25 @@ $(OBJ_DIR_RELEASE_MPI)/%.cpp.o: %.cpp
 	$(MPICXX) $(RELEASE_FLAGS) -c $< -o $@
 
 # Engine release build target
-ENGINE_RELEASE_OBJS := $(SUB_OBJS_RELEASE_MPI) $(OBJ_DIR_RELEASE_MPI)/src/engine.cpp.o
+ENGINE_RELEASE_OBJS := $(SUB_OBJS_RELEASE_MPI) $(OBJ_DIR_RELEASE_MPI)/src/server.cpp.o
 server_release: $(ENGINE_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_RELEASE))
 	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) $(LD_FLAGS_SERVER)
 
 # Engine debug target
-ENGINE_DEBUG_OBJS := $(SUB_OBJS_DEBUG_MPI) $(OBJ_DIR_DEBUG_MPI)/src/engine.cpp.o
+ENGINE_DEBUG_OBJS := $(SUB_OBJS_DEBUG_MPI) $(OBJ_DIR_DEBUG_MPI)/src/server.cpp.o
 server_debug: $(ENGINE_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_DEBUG))
 	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) $(LD_FLAGS_SERVER)
 
 # Viewer release target
-VIEWER_RELEASE_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_RELEASE)/src/viewer.cpp.o
+VIEWER_RELEASE_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_RELEASE)/src/client.cpp.o
 client_release: move_shaders $(VIEWER_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_RELEASE))
 	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS_CLIENT)
 
 # Viewer debug target
-VIEWER_DEBUG_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_DEBUG)/src/viewer.cpp.o
+VIEWER_DEBUG_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_DEBUG)/src/client.cpp.o
 client_debug: move_shaders $(VIEWER_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_DEBUG))
 	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS_CLIENT)
