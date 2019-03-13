@@ -20,8 +20,8 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
-LD_FLAGS_SERVER ?= -lboost_system -loptparse
-LD_FLAGS_CLIENT ?= -lboost_system -loptparse -lgltools -lGLEW -lglfw -lGL
+LD_FLAGS_SERVER ?= -lboost_system -loptparse -lpthread
+LD_FLAGS_CLIENT ?= -lboost_system -loptparse -lpthread -lgltools -lGLEW -lglfw -lGL
 
 # Sources which define main functions
 MAIN_SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp)
