@@ -20,7 +20,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
-LD_FLAGS ?= -lboost_system -loptparse
+LD_FLAGS ?= -lboost_system -loptparse -lgltools  -lGLEW -lglfw -lGL
 
 # Sources which define main functions
 MAIN_SRCS := $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp)
@@ -72,15 +72,22 @@ engine-debug: $(ENGINE_DEBUG_OBJS)
 
 # Viewer release target
 VIEWER_RELEASE_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_RELEASE)/src/viewer.cpp.o
-viewer-release: $(VIEWER_RELEASE_OBJS)
+viewer-release: move_shaders $(VIEWER_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_RELEASE))
-	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS) -lgltools -lGLEW -lglfw -lGL
+	$(CXX) $(VIEWER_RELEASE_OBJS) -o $(TARGET_VIEWER_RELEASE) $(LD_FLAGS)
 
 # Viewer debug target
 VIEWER_DEBUG_OBJS := $(SUB_OBJS_DEBUG) $(OBJ_DIR_DEBUG)/src/viewer.cpp.o
-viewer-debug: $(VIEWER_DEBUG_OBJS)
+viewer-debug: move_shaders $(VIEWER_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_VIEWER_DEBUG))
-	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS) -lgltools -lGLEW -lglfw -lGL
+	$(CXX) $(VIEWER_DEBUG_OBJS) -o $(TARGET_VIEWER_DEBUG) $(LD_FLAGS)
+
+# Simple target, collect glsl files in the shaders folder
+GLSL_SRCS := $(shell find $(SRC_DIRS) -name *.glsl)
+SHADER_BIN_DIR := bin/shaders
+move_shaders:
+	@$(MKDIR_P) $(SHADER_BIN_DIR)
+	cp $(GLSL_SRCS) $(SHADER_BIN_DIR)
 
 # Make all targets
 release: engine-release viewer-release

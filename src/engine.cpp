@@ -27,7 +27,7 @@ void AddOptions(OptionParser& opt) {
                  {"1"}));
   opt.Add(Option("updaterate", 'f', ARG_TYPE_FLOAT,
                  "How many times per second to update connected clients",
-                 {"20"}));
+                 {"60"}));
   opt.Add(Option("port", 'p', ARG_TYPE_INT,
                  "Port to listen for clients on",
                  {_MPIGRAV_DEFAULT_PORT}));
@@ -47,10 +47,10 @@ int main(int argc, char **argv) {
   Vec3* f = new Vec3[n];      // Total force on each body
 
   // Set some initial body positions
-  body[0].pos = Vec3(-5, 0, 0);
-  body[0].m = 10000;
-  body[1].pos = Vec3(5, 0, 0);
-  body[1].m = 10000;
+  body[0].pos = Vec3(-1, 0, 0);
+  body[0].m = 100000;
+  body[1].pos = Vec3(1, 0, 0);
+  body[1].m = 200000;
 
   // Listen for incoming client connections
   ClientManager clients(opt.Get("port"));

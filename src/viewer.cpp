@@ -5,10 +5,12 @@
 #include <unistd.h>
 
 #include <GLT/Window.hpp>
+#include <GLT/Mesh.hpp>
 #include <optparse.hpp>
 
 #include "Master.hpp"
 #include "comm/Server.hpp"
+#include "draw/Draw.hpp"
 
 
 void AddOptions(OptionParser& opt) {
@@ -35,12 +37,20 @@ int main(int argc, char **argv) {
   ss << host << ":" << port;
   GLT::Window window(1024, 768, ss.str());
   window.EnableFpsCounter();
+  window.camera.SetPos(0, 0, -3);
+  glfwSwapInterval(0);
+
+  // Build shaders
+  GLT::ShaderProgram bodyShader = BuildBodyShader();
 
   // Loop forever (for now)
   bool done = false;
   while(!done) {
-    std::vector<Body> bodyData = server.GetData();
     if(window.KeyPressed(GLFW_KEY_ESCAPE)) done = true;
+    std::vector<Body> bodies = server.GetData();
+    GLT::Mesh bodyMesh = MakeMeshFromBodyList(bodies);
+    glm::mat4 m = glm::mat4(1.0f);
+    window.Draw(bodyMesh, bodyShader, m);
     window.Refresh();
   }
 
