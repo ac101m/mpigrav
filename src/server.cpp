@@ -1,9 +1,10 @@
 #include <iostream>
 #include <vector>
+using namespace std;
+
 #include <unistd.h>
 #include <math.h>
 #include "mpi.h"
-using namespace std;
 
 #include <optparse.hpp>
 
@@ -47,8 +48,12 @@ int main(int argc, char **argv) {
   std::vector<Vec3> f(n);
 
   // Set some initial body positions
-  body[0].pos = Vec3( -1, 0, 0); body[0].m = 100000;
-  body[1].pos = Vec3(0.5, 0, 0); body[1].m = 200000;
+  for(int i = 0; i < n; i++) {
+    body[i].pos.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].pos.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].pos.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].m = 100000;
+  }
 
   // Listen for incoming client connections
   ClientManager clients(opt.Get("port"));
