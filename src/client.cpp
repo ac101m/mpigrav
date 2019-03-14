@@ -44,9 +44,45 @@ int main(int argc, char **argv) {
   // Build shaders
   GLT::ShaderProgram bodyShader = BuildBodyShader();
 
+
+//====[TEMPORARY]============================================================//
+  // Input sensitifity stuff
+  float rotateSpeed = 1.0f;
+	float moveSpeed = 1.0f;
+	float mouseSensitivity = 0.003f;
+  float dFwd, dRight, dUp, dr = 0.0f;
+//====[TEMPORARY]============================================================//
+
+
   // Loop forever (for now)1
-  while(1) {
-    if(window.KeyPressed(GLFW_KEY_ESCAPE)) break;
+  while(!window.ShouldClose()) {
+
+
+//====[TEMPORARY]============================================================//
+    // get current time
+    float dt = window.GetTimeDelta();
+
+    // Cursor capture control
+    glm::vec2 cursorDelta = window.GetCursorDelta() * mouseSensitivity;
+    if(window.KeyPressed(GLFW_KEY_ESCAPE)) window.FreeCursor();
+    if(window.KeyPressed(GLFW_KEY_M)) window.CaptureCursor();
+
+    // Camera translation & rotation
+    dr = dFwd = dRight = dUp = 0.0f;
+    if(window.KeyPressed(GLFW_KEY_W)) dFwd += (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_S)) dFwd -= (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_A)) dRight += (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_D)) dRight -= (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_SPACE)) dUp += (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_C)) dUp -= (dt * moveSpeed);
+    if(window.KeyPressed(GLFW_KEY_E)) dr += (dt * rotateSpeed);
+    if(window.KeyPressed(GLFW_KEY_Q)) dr -= (dt * rotateSpeed);
+
+    // Update window camera
+    window.camera.Move(dRight, dUp, dFwd);
+    window.camera.MoveLook(-cursorDelta.x, cursorDelta.y, dr);
+//====[TEMPORARY]============================================================//
+
 
     // Get body data and draw
     std::vector<Body> bodies = server.GetBodyData();
