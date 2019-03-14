@@ -94,6 +94,8 @@ move_shaders:
 # Make all targets
 release: client_release server_release
 debug: client_debug server_debug
+client: client_release client_debug
+server: server_release server_debug
 all: release debug
 
 # Clean, be careful with this
