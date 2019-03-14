@@ -47,26 +47,17 @@ int main(int argc, char **argv) {
   Vec3* f = new Vec3[n];      // Total force on each body
 
   // Set some initial body positions
-  body[0].pos = Vec3(-1, 0, 0);
-  body[0].m = 100000;
-  body[1].pos = Vec3(1, 0, 0);
-  body[1].m = 200000;
+  body[0].pos = Vec3( -1, 0, 0); body[0].m = 100000;
+  body[1].pos = Vec3(0.5, 0, 0); body[1].m = 200000;
 
   // Listen for incoming client connections
-  ClientManager clients(opt.Get("port"));
-
-  double t = MPI_Wtime();
-  double tPrevDisplayUpdate = t;
-  double tUpdateInterval = 1 / (double)opt.Get("updaterate");
+  ClientManager clientManager(opt.Get("port"));
 
   // Loop forever (for now)
   while(1) {
 
     // Update clients about simulation progress
-    if((MPI_Wtime() - tPrevDisplayUpdate) >= tUpdateInterval) {
-      tPrevDisplayUpdate = MPI_Wtime();
-      clients.Update(body, n);
-    }
+    if(clientManager.UpdateRequired()) clientManager.Update(body, n);
 
     // For each body, sum forces
     for(int i = 0; i < n; i++) {
@@ -91,5 +82,8 @@ int main(int argc, char **argv) {
     }
   }
 
+  // All done
+  delete [] body;
+  delete [] f;
   return 0;
 }

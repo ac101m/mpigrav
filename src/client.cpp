@@ -12,9 +12,11 @@
 #include "comm/Server.hpp"
 #include "draw/Draw.hpp"
 
+#include <unistd.h>
+
 
 void AddOptions(OptionParser& opt) {
-  opt.Add(Option("host", 'h', ARG_TYPE_STRING,
+  opt.Add(Option("address", 'a', ARG_TYPE_STRING,
                  "IP address of host to connect to",
                  {"127.0.0.1"}));
   opt.Add(Option("port", 'p', ARG_TYPE_INT,
@@ -28,17 +30,16 @@ int main(int argc, char **argv) {
   AddOptions(opt);
 
   // Connect to the server
-  std::string host = opt.Get("host");
+  std::string address = opt.Get("address");
   int port = opt.Get("port");
-  Server server(host, port);
+  Server server(address, port);
 
-  // Open a window with title indicating the host
+  // Set up a window for drawing
   std::stringstream ss;
-  ss << host << ":" << port;
+  ss << address << ":" << port;
   GLT::Window window(1024, 768, ss.str());
   window.EnableFpsCounter();
   window.camera.SetPos(0, 0, -3);
-  glfwSwapInterval(0);
 
   // Build shaders
   GLT::ShaderProgram bodyShader = BuildBodyShader();
@@ -47,7 +48,7 @@ int main(int argc, char **argv) {
   bool done = false;
   while(!done) {
     if(window.KeyPressed(GLFW_KEY_ESCAPE)) done = true;
-    std::vector<Body> bodies = server.GetData();
+    std::vector<Body> bodies = server.GetBodyData();
     GLT::Mesh bodyMesh = MakeMeshFromBodyList(bodies);
     glm::mat4 m = glm::mat4(1.0f);
     window.Draw(bodyMesh, bodyShader, m);

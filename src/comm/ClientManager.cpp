@@ -8,39 +8,88 @@ using ip::tcp;
 
 #include <Body.hpp>
 
+
 // Constructor, starts listening on port
-ClientManager::ClientManager(int const port) :
-  acceptor(this->ioService, tcp::endpoint(tcp::v4(), port)) {
-
-  // Wait for someone to connect (temporary, we'll make this async later)
-  std::cout << "Listening for clients on port: " << port << "\n";
-  std::shared_ptr<tcp::socket> socket(new tcp::socket(this->ioService));
-  this->acceptor.accept(*socket);
-
-  // Client now managed lifetime of socket
-  this->clients.push_back(Client(socket));
+ClientManager::ClientManager(int const port) : port(port) {
+  this->connectionListenerThread =
+    std::thread(&ClientManager::ConnectionListenerMain, this);
 }
 
 
-// Same as above, but with raw pointers
-void ClientManager::Update(Body const * const bodies, int const n) {
-  if(!this->clients.size()) return;
+// Client listener thread
+void ClientManager::ConnectionListenerMain(void) {
+  io_service ioService;
+  ip::tcp::acceptor acceptor(ioService, tcp::endpoint(tcp::v4(), this->port));
 
-  // Copy body data to an internal buffer
+  std::cout << "Listening for connections on port: " << this->port << "\n";
+  while(1) {
+
+    // Wait for someone to connect
+    std::shared_ptr<tcp::socket> socket(new tcp::socket(ioService));
+    acceptor.accept(*socket);
+    socket->set_option(tcp::no_delay(true));
+    std::cout << "Client connected!\n";
+
+    // Create a new client thread
+    this->clientThreads.push_back(
+      std::thread(&ClientManager::ClientResponderMain, this, socket));
+  }
+}
+
+
+// Client responder main
+void ClientManager::ClientResponderMain(std::shared_ptr<tcp::socket> socket) {
+  try {
+    while(1) {
+      switch(this->GetClientRequest(socket)) {
+        case REQUEST_BODY_DATA:
+          this->updateRequired = true;
+          this->SendBodyData(socket);
+          break;
+        default:
+          std::cout << "Warning, unrecognised request ignored\n";
+          break;
+      }
+    }
+  } catch(const std::exception& e) {
+    std::cout << "Client disconnected: " << e.what() << "\n";
+  }
+}
+
+
+request_t ClientManager::GetClientRequest(std::shared_ptr<tcp::socket>& socket) {
+  request_t request;
+  socket->receive(buffer(&request, sizeof(request_t)));
+  return request;
+}
+
+
+void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
+  this->bodyDataMutex.lock();
+  unsigned n = this->bodies.size();
+  socket->send(boost::asio::buffer(&n, sizeof(unsigned)));
+  socket->send(boost::asio::buffer(this->bodies.data(), n * sizeof(Body)));
+  this->bodyDataMutex.unlock();
+}
+
+
+// Update internal buffer
+void ClientManager::Update(Body const * const bodies, int const n) {
+  this->bodyDataMutex.lock();
+
+  // Copy body data to internal buffer
+  this->updateRequired = false;
   this->bodies.clear();
   this->bodies.reserve(n);
   for(int i = 0; i < n; i++) {
     this->bodies.push_back(bodies[i]);
   }
 
-  // Transmit to clients
-  for(unsigned i = 0; i < this->clients.size(); i++) {
-    clients[i].Update(bodies, n);
-  }
+  this->bodyDataMutex.unlock();
 }
 
 
-// Update buffer from vector too
+// Update buffer from vector
 void ClientManager::Update(std::vector<Body> const& bodies) {
   this->Update(&bodies[0], bodies.size());
 }

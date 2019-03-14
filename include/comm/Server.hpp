@@ -6,6 +6,7 @@
 #include <boost/asio.hpp>
 
 #include "Body.hpp"
+#include "comm/Request.hpp"
 
 
 class Server {
@@ -13,9 +14,13 @@ class Server {
     boost::asio::io_service ioService;
     boost::asio::ip::tcp::socket socket;
 
+//=====[PRIVATE METHODS]=====================================================//
+
+    void SendRequest(request_t request);
+
   public:
     Server(std::string const host, int const port);
-    std::vector<Body> GetData(void);
+    std::vector<Body> GetBodyData(void);
 };
 
 
