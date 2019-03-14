@@ -17,7 +17,7 @@ Server::Server(std::string const host, int const port) :
 
 // Send a request to the server
 void Server::SendRequest(request_t request) {
-  this->socket.send(buffer(&request, sizeof(request_t)));
+  write(this->socket, buffer(&request, sizeof(request_t)));
 }
 
 
@@ -26,9 +26,9 @@ std::vector<Body> Server::GetBodyData(void) {
   this->SendRequest(REQUEST_BODY_DATA);
 
   unsigned n = 2;
-  this->socket.receive(buffer(&n, sizeof(unsigned)));
+  read(this->socket, buffer(&n, sizeof(unsigned)));
   std::vector<Body> bodies(n);
-  this->socket.receive(buffer(bodies.data(), n * sizeof(Body)));
+  read(this->socket, buffer(bodies.data(), n * sizeof(Body)));
 
   return bodies;
 }

@@ -59,7 +59,7 @@ void ClientManager::ClientResponderMain(std::shared_ptr<tcp::socket> socket) {
 
 request_t ClientManager::GetClientRequest(std::shared_ptr<tcp::socket>& socket) {
   request_t request;
-  socket->receive(buffer(&request, sizeof(request_t)));
+  read(*socket, buffer(&request, sizeof(request_t)));
   return request;
 }
 
@@ -67,8 +67,8 @@ request_t ClientManager::GetClientRequest(std::shared_ptr<tcp::socket>& socket) 
 void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
   this->bodyDataMutex.lock();
   unsigned n = this->bodies.size();
-  socket->send(boost::asio::buffer(&n, sizeof(unsigned)));
-  socket->send(boost::asio::buffer(this->bodies.data(), n * sizeof(Body)));
+  write(*socket, buffer(&n, sizeof(unsigned)));
+  write(*socket, buffer(this->bodies.data(), n * sizeof(Body)));
   this->bodyDataMutex.unlock();
 }
 
