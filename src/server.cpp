@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
     }
 
     // For each body, sum forces
+    #pragma omp parallel for
     for(int i = 0; i < n; i++) {
       f[i].x = f[i].y = f[i].z = 0;
 
@@ -83,6 +84,7 @@ int main(int argc, char **argv) {
     }
 
     // Update body positions and velocities
+    #pragma omp parallel for
     for(int i = 0; i < n; i++) {
       body[i].v = body[i].v + ((f[i] / body[i].m) * dt);
       body[i].Update(dt);
