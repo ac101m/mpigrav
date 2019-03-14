@@ -44,10 +44,11 @@ int main(int argc, char **argv) {
   // Build shaders
   GLT::ShaderProgram bodyShader = BuildBodyShader();
 
-  // Loop forever (for now)
-  bool done = false;
-  while(!done) {
-    if(window.KeyPressed(GLFW_KEY_ESCAPE)) done = true;
+  // Loop forever (for now)1
+  while(1) {
+    if(window.KeyPressed(GLFW_KEY_ESCAPE)) break;
+
+    // Get body data and draw
     std::vector<Body> bodies = server.GetBodyData();
     GLT::Mesh bodyMesh = MakeMeshFromBodyList(bodies);
     glm::mat4 m = glm::mat4(1.0f);
