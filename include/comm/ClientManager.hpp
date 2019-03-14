@@ -36,9 +36,7 @@ class ClientManager {
   public:
     ClientManager(int const port);
 
-    // Refresh internal buffer
-    void Update(std::vector<Body> const& bodies);
-    void Update(Body const * const bodies, int const n);
+    void UpdateBodyData(std::vector<Body> const& bodies);
     bool UpdateRequired(void) {return this->updateRequired;}
 };
 

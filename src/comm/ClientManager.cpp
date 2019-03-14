@@ -74,7 +74,7 @@ void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
 
 
 // Update buffer from vector
-void ClientManager::Update(std::vector<Body> const& bodies) {
+void ClientManager::UpdateBodyData(std::vector<Body> const& bodies) {
   this->bodyDataMutex.lock();
   this->bodies = bodies;
   this->bodyDataMutex.unlock();

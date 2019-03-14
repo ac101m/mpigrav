@@ -51,14 +51,14 @@ int main(int argc, char **argv) {
   body[1].pos = Vec3(0.5, 0, 0); body[1].m = 200000;
 
   // Listen for incoming client connections
-  ClientManager clientManager(opt.Get("port"));
+  ClientManager clients(opt.Get("port"));
 
   // Loop forever (for now)
   while(1) {
 
     // Update clients about simulation progress
-    if(clientManager.UpdateRequired()) {
-      clientManager.Update(body);
+    if(clients.UpdateRequired()) {
+      clients.UpdateBodyData(body);
     }
 
     // For each body, sum forces
