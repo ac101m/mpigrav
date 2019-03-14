@@ -43,8 +43,8 @@ int main(int argc, char **argv) {
   fp_t dt = opt.Get("timestep");
   fp_t d = opt.Get("damping");
 
-  Body* body = new Body[n];   // Bodies
-  Vec3* f = new Vec3[n];      // Total force on each body
+  std::vector<Body> body(n);
+  std::vector<Vec3> f(n);
 
   // Set some initial body positions
   body[0].pos = Vec3( -1, 0, 0); body[0].m = 100000;
@@ -57,7 +57,9 @@ int main(int argc, char **argv) {
   while(1) {
 
     // Update clients about simulation progress
-    if(clientManager.UpdateRequired()) clientManager.Update(body, n);
+    if(clientManager.UpdateRequired()) {
+      clientManager.Update(body);
+    }
 
     // For each body, sum forces
     for(int i = 0; i < n; i++) {
@@ -82,8 +84,5 @@ int main(int argc, char **argv) {
     }
   }
 
-  // All done
-  delete [] body;
-  delete [] f;
   return 0;
 }

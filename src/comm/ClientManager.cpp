@@ -43,8 +43,8 @@ void ClientManager::ClientResponderMain(std::shared_ptr<tcp::socket> socket) {
     while(1) {
       switch(this->GetClientRequest(socket)) {
         case REQUEST_BODY_DATA:
-          this->updateRequired = true;
           this->SendBodyData(socket);
+          this->updateRequired = true;
           break;
         default:
           std::cout << "Warning, unrecognised request ignored\n";
@@ -73,23 +73,9 @@ void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
 }
 
 
-// Update internal buffer
-void ClientManager::Update(Body const * const bodies, int const n) {
-  this->bodyDataMutex.lock();
-
-  // Copy body data to internal buffer
-  this->updateRequired = false;
-  this->bodies.clear();
-  this->bodies.reserve(n);
-  for(int i = 0; i < n; i++) {
-    this->bodies.push_back(bodies[i]);
-  }
-
-  this->bodyDataMutex.unlock();
-}
-
-
 // Update buffer from vector
 void ClientManager::Update(std::vector<Body> const& bodies) {
-  this->Update(&bodies[0], bodies.size());
+  this->bodyDataMutex.lock();
+  this->bodies = bodies;
+  this->bodyDataMutex.unlock();
 }
