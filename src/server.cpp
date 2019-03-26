@@ -26,9 +26,6 @@ void AddOptions(OptionParser& opt) {
   opt.Add(Option("damping", 'd', ARG_TYPE_FLOAT,
                  "Damping coefficient to stop infinities making a mess of things",
                  {"1"}));
-  opt.Add(Option("updaterate", 'f', ARG_TYPE_FLOAT,
-                 "How many times per second to update connected clients",
-                 {"60"}));
   opt.Add(Option("port", 'p', ARG_TYPE_INT,
                  "Port to listen for clients on",
                  {_MPIGRAV_DEFAULT_PORT}));
