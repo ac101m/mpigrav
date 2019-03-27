@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
     body[i].pos.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
     body[i].pos.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
     body[i].pos.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].pos = Normalize(body[i].pos);
     body[i].m = 100000;
   }
 
@@ -62,6 +63,11 @@ int main(int argc, char **argv) {
   // Tell openmp how many threads to use
   int threadCount = opt.Get("threadcount");
   omp_set_num_threads(threadCount);
+
+  // Limit number of iterations. Temporary
+  unsigned iterationCount = 0;
+  unsigned iterationMax = 10000;
+  while(iterationCount++ < iterationMax) {
 
     // Update clients about simulation progress
     if(clients.UpdateRequired()) {
