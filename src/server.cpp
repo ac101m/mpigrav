@@ -3,8 +3,9 @@
 using namespace std;
 
 #include <unistd.h>
-#include <math.h>
+#include <cmath>
 #include "mpi.h"
+#include "omp.h"
 
 #include <optparse.hpp>
 
@@ -29,6 +30,9 @@ void AddOptions(OptionParser& opt) {
   opt.Add(Option("port", 'p', ARG_TYPE_INT,
                  "Port to listen for clients on",
                  {_MPIGRAV_DEFAULT_PORT}));
+  opt.Add(Option("threadcount", 't', ARG_TYPE_INT,
+                 "Number of threads to use for each instance",
+                 {"1"}));
 }
 
 
@@ -55,8 +59,9 @@ int main(int argc, char **argv) {
   // Listen for incoming client connections
   ClientManager clients(opt.Get("port"));
 
-  // Loop forever (for now)
-  while(1) {
+  // Tell openmp how many threads to use
+  int threadCount = opt.Get("threadcount");
+  omp_set_num_threads(threadCount);
 
     // Update clients about simulation progress
     if(clients.UpdateRequired()) {
