@@ -33,6 +33,9 @@ void AddOptions(OptionParser& opt) {
   opt.Add(Option("threadcount", 't', ARG_TYPE_INT,
                  "Number of threads to use for each instance",
                  {"1"}));
+  opt.Add(Option("iterationlimit", 'i', ARG_TYPE_INT,
+                 "Limits the number of iterations to perform 0 = infinite",
+                 {"0"}));
 }
 
 
@@ -64,10 +67,10 @@ int main(int argc, char **argv) {
   int threadCount = opt.Get("threadcount");
   omp_set_num_threads(threadCount);
 
-  // Limit number of iterations. Temporary
-  unsigned iterationCount = 0;
-  unsigned iterationMax = 1000;
-  while(iterationCount++ < iterationMax) {
+  // Limit number of iterations based on command line option
+  int iterationCount = 0;
+  int iterationLimit = opt.Get("iterationlimit");
+  while(!iterationLimit || iterationCount++ < iterationLimit) {
 
     // Update clients about simulation progress
     if(clients.UpdateRequired()) {
