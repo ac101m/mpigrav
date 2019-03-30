@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   fp_t d = opt.Get("damping");
 
   std::vector<Body> body(n);
-  std::vector<Vec3> f(n);
+  std::vector<Vec3> a(n);
 
   // Set some initial body positions
   for(int i = 0; i < n; i++) {
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
 
   // Limit number of iterations. Temporary
   unsigned iterationCount = 0;
-  unsigned iterationMax = 10000;
+  unsigned iterationMax = 1000;
   while(iterationCount++ < iterationMax) {
 
     // Update clients about simulation progress
@@ -74,27 +74,32 @@ int main(int argc, char **argv) {
       clients.UpdateBodyData(body);
     }
 
-    // For each body, sum forces
+    // For each body
     #pragma omp parallel for
     for(int i = 0; i < n; i++) {
-      f[i].x = f[i].y = f[i].z = 0;
+      a[i].x = a[i].y = a[i].z = 0;
 
-      // For each other body add force (G*m1*m2/r^2)
-      for(int j = 0; j < n; j++) if(i != j) {
-        Vec3 dij = body[j].pos - body[i].pos;
-        fp_t r2 = (dij.x * dij.x) + (dij.y * dij.y) + (dij.z * dij.z);
-        fp_t force = (G * body[i].m * body[j].m) / (r2 + d);
-        fp_t r = sqrt(r2);
-        f[i].x += force * dij.x / r;
-        f[i].y += force * dij.y / r;
-        f[i].z += force * dij.z / r;
+      // For each other body
+      for(int j = 0; j < n; j++) {
+        if(i != j) {
+          Vec3 dij = body[j].pos - body[i].pos;
+          fp_t r2 = (dij.x * dij.x) + (dij.y * dij.y) + (dij.z * dij.z);
+          fp_t acceleration = body[j].m / (r2 + d);
+          fp_t r = sqrt(r2);
+          a[i].x += acceleration * dij.x / r;
+          a[i].y += acceleration * dij.y / r;
+          a[i].z += acceleration * dij.z / r;
+        }
       }
+
+      // Apply gravitational constant
+      a[i] = a[i] * G;
     }
 
     // Update body positions and velocities
     #pragma omp parallel for
     for(int i = 0; i < n; i++) {
-      body[i].v = body[i].v + ((f[i] / body[i].m) * dt);
+      body[i].v = body[i].v + (a[i] * dt);
       body[i].Update(dt);
     }
   }
