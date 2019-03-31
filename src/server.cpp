@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   int iterationCount = 0;
   int iterationLimit = opt.Get("iterationlimit");
   while(!iterationLimit || iterationCount < iterationLimit) {
-    std::cout << "Iteration " << iterationCount++ << "\n";
+    iterationCount++;
 
     // Update clients about simulation progress
     if(clients.UpdateRequired()) {
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
       // Compute acceletation due to other bodies
       for(int j = 0; j < n; j++) {
-        if(i != j) {
+        if((i != j) && (body[j].r != body[i].r)) {
           Vec3 dr = body[j].r - body[i].r;
           fp_t r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
           fp_t acceleration = body[j].m / (r2 + d);
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     // Update body positions and velocities (integration step?)
     #pragma omp parallel for
     for(int i = 0; i < n; i++) {
-      body[i].r = body[i].r + (v[i] * dt) + ((a[i] * dt) / 2);
+      body[i].r = body[i].r + (v[i] * dt) + ((a[i] * (dt * dt)) / 2);
       v[i] = v[i] + (a[i] * dt);
     }
   }
