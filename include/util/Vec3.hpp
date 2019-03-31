@@ -32,7 +32,9 @@ Vec3 operator*(Vec3 lhs, Vec3 const& rhs);
 Vec3 operator*(Vec3 lhs, fp_t const& rhs);
 Vec3 operator/(Vec3 lhs, Vec3 const& rhs);
 Vec3 operator/(Vec3 lhs, fp_t const& rhs);
+
 Vec3 Normalize(Vec3 lhs);
+fp_t Magnitude(Vec3 const& lhs);
 
 
 #endif // _MPIGRAV_VEC3_INCLUDED

@@ -49,3 +49,9 @@ Vec3 Normalize(Vec3 lhs) {
   lhs.z /= length;
   return lhs;
 }
+
+
+// Get magnitude of vector
+fp_t Magnitude(Vec3 const& lhs) {
+  return sqrt(lhs.x*lhs.x + lhs.y*lhs.y + lhs.z*lhs.z);
+}
