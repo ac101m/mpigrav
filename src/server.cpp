@@ -63,9 +63,11 @@ int main(int argc, char **argv) {
   // Listen for incoming client connections
   ClientManager clients(opt.Get("port"));
 
-  // Tell openmp how many threads to use
-  int threadCount = opt.Get("threadcount");
-  omp_set_num_threads(threadCount);
+  // If custom thread count was supplied, override OMP_NUM_THREADS
+  if(opt.Specified("threadcount")) {
+    int threadCount = opt.Get("threadcount");
+    omp_set_num_threads(threadCount);
+  }
 
   // Limit number of iterations based on command line option
   int iterationCount = 0;
