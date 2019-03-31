@@ -49,14 +49,15 @@ int main(int argc, char **argv) {
   fp_t d = opt.Get("damping");
 
   std::vector<Body> body(n);
+  std::vector<Vec3> v(n);
   std::vector<Vec3> a(n);
 
   // Set some initial body positions
   for(int i = 0; i < n; i++) {
-    body[i].pos.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].pos.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].pos.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].pos = Normalize(body[i].pos);
+    body[i].r.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].r.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].r.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    body[i].r = Normalize(body[i].r);
     body[i].m = 100000;
   }
 
@@ -72,7 +73,8 @@ int main(int argc, char **argv) {
   // Limit number of iterations based on command line option
   int iterationCount = 0;
   int iterationLimit = opt.Get("iterationlimit");
-  while(!iterationLimit || iterationCount++ < iterationLimit) {
+  while(!iterationLimit || iterationCount < iterationLimit) {
+    std::cout << "Iteration " << iterationCount++ << "\n";
 
     // Update clients about simulation progress
     if(clients.UpdateRequired()) {
@@ -84,28 +86,28 @@ int main(int argc, char **argv) {
     for(int i = 0; i < n; i++) {
       a[i].x = a[i].y = a[i].z = 0;
 
-      // For each other body
+      // Compute acceletation due to other bodies
       for(int j = 0; j < n; j++) {
         if(i != j) {
-          Vec3 dij = body[j].pos - body[i].pos;
-          fp_t r2 = (dij.x * dij.x) + (dij.y * dij.y) + (dij.z * dij.z);
+          Vec3 dr = body[j].r - body[i].r;
+          fp_t r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
           fp_t acceleration = body[j].m / (r2 + d);
           fp_t r = sqrt(r2);
-          a[i].x += acceleration * dij.x / r;
-          a[i].y += acceleration * dij.y / r;
-          a[i].z += acceleration * dij.z / r;
+          a[i].x += acceleration * dr.x / r;
+          a[i].y += acceleration * dr.y / r;
+          a[i].z += acceleration * dr.z / r;
         }
       }
 
-      // Apply gravitational constant
+      // Apply gravitational constant, no need to do this in every iteration
       a[i] = a[i] * G;
     }
 
-    // Update body positions and velocities
+    // Update body positions and velocities (integration step?)
     #pragma omp parallel for
     for(int i = 0; i < n; i++) {
-      body[i].v = body[i].v + (a[i] * dt);
-      body[i].Update(dt);
+      body[i].r = body[i].r + (v[i] * dt) + ((a[i] * dt) / 2);
+      v[i] = v[i] + (a[i] * dt);
     }
   }
 

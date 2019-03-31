@@ -10,17 +10,12 @@
 
 class Body {
   public:
-    Vec3 pos;      // Position, meters
-    Vec3 v;        // Velocity, meters per second
-    fp_t m;        // Mass, kilograms
+    Vec3 r;   // Position, meters
+    fp_t m;   // Mass, kilograms
 
   public:
     Body(void) : m(1) {}
-    Body(Vec3 const pos, fp_t const mass) : pos(pos), m(mass) {}
-
-    // Applies veolocity with given timestep
-    inline void Update(fp_t const dt) {this->pos = this->pos + (v * dt);}
-    inline Vec3 Force(Body const& other);
+    Body(Vec3 const pos, fp_t const mass) : r(pos), m(mass) {}
 };
 
 

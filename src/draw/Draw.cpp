@@ -15,9 +15,9 @@ GLT::ShaderProgram BuildBodyShader(void) {
 GLT::Mesh MakeMeshFromBodyList(std::vector<Body> const& bodies) {
   std::vector<GLT::vertex_t> v(bodies.size());
   for(unsigned i = 0; i < bodies.size(); i++) {
-    v[i].position.x = bodies[i].pos.x;    //
-    v[i].position.y = bodies[i].pos.y;    // Position
-    v[i].position.z = bodies[i].pos.z;    //
+    v[i].position.x = bodies[i].r.x;      //
+    v[i].position.y = bodies[i].r.y;      // Position
+    v[i].position.z = bodies[i].r.z;      //
     v[i].normal = glm::vec3(1, 1, 1);     // Colour (just white for now)
   }
   return GLT::Mesh(v);
