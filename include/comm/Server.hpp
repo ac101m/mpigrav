@@ -14,6 +14,8 @@ class Server {
     boost::asio::io_service ioService;
     boost::asio::ip::tcp::socket socket;
 
+    std::vector<Body> bodies;
+
 //=====[PRIVATE METHODS]=====================================================//
 
     void SendRequest(request_t request);

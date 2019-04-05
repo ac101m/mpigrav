@@ -31,6 +31,7 @@ class ClientManager {
     // Client reponder thread, handles requests from clients
     void ClientResponderMain(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
     request_t GetClientRequest(std::shared_ptr<boost::asio::ip::tcp::socket>& socket);
+    void SendInt(std::shared_ptr<boost::asio::ip::tcp::socket>& socket, int i);
     void SendBodyData(std::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 
   public:

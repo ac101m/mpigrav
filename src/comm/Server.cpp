@@ -25,10 +25,13 @@ void Server::SendRequest(request_t request) {
 std::vector<Body> Server::GetBodyData(void) {
   this->SendRequest(REQUEST_BODY_DATA);
 
-  unsigned n = 2;
+  unsigned n;
   read(this->socket, buffer(&n, sizeof(unsigned)));
-  std::vector<Body> bodies(n);
-  read(this->socket, buffer(bodies.data(), n * sizeof(Body)));
+  if(n) {
+    std::vector<Body> buf(n);
+    read(this->socket, buffer(buf.data(), n * sizeof(Body)));
+    this->bodies = buf;
+  }
 
-  return bodies;
+  return this->bodies;
 }

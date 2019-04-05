@@ -43,8 +43,12 @@ void ClientManager::ClientResponderMain(std::shared_ptr<tcp::socket> socket) {
     while(1) {
       switch(this->GetClientRequest(socket)) {
         case REQUEST_BODY_DATA:
-          this->SendBodyData(socket);
-          this->updateRequired = true;
+          if(this->updateRequired) {
+            this->SendBodyData(socket);
+            this->updateRequired = false;
+          } else {
+            this->SendInt(socket, 0);
+          }
           break;
         default:
           std::cout << "Warning, unrecognised request ignored\n";
@@ -64,18 +68,28 @@ request_t ClientManager::GetClientRequest(std::shared_ptr<tcp::socket>& socket) 
 }
 
 
-void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
-  this->bodyDataMutex.lock();
-  unsigned n = this->bodies.size();
-  write(*socket, buffer(&n, sizeof(unsigned)));
-  write(*socket, buffer(this->bodies.data(), n * sizeof(Body)));
-  this->bodyDataMutex.unlock();
+void ClientManager::SendInt(std::shared_ptr<tcp::socket>& socket, int i) {
+  write(*socket, buffer(&i, sizeof(int)));
 }
 
 
-// Update buffer from vector
+void ClientManager::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
+
+  // Create intermediate buffer so compute doesn't stall during transmission
+  this->bodyDataMutex.lock();
+  std::vector<Body> buf = this->bodies;
+  this->bodyDataMutex.unlock();
+
+  // Transmit body data
+  this->SendInt(socket, buf.size());
+  write(*socket, buffer(buf.data(), buf.size() * sizeof(Body)));
+}
+
+
+// Update internal body buffer
 void ClientManager::UpdateBodyData(std::vector<Body> const& bodies) {
   this->bodyDataMutex.lock();
   this->bodies = bodies;
   this->bodyDataMutex.unlock();
+  this->updateRequired = true;
 }

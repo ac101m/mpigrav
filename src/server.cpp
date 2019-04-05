@@ -79,9 +79,7 @@ int main(int argc, char **argv) {
     iterationCount++;
 
     // Update clients about simulation progress
-    if(clients.UpdateRequired()) {
-      clients.UpdateBodyData(body);
-    }
+    clients.UpdateBodyData(body);
 
     // For each body
     #pragma omp parallel for
