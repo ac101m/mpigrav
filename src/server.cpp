@@ -40,7 +40,9 @@ void AddOptions(OptionParser& opt) {
 
 
 int main(int argc, char **argv) {
-  OptionParser opt(argc, argv, "mpigrav compute engine");
+  MPI_Init(&argc, &argv);
+
+  OptionParser opt(argc, argv, "mpigrav compute server");
   AddOptions(opt);
 
   int n = opt.Get("nbodies");
@@ -111,5 +113,6 @@ int main(int argc, char **argv) {
     }
   }
 
+  MPI_Finalize();
   return 0;
 }
