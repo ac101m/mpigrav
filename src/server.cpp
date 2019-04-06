@@ -1,16 +1,19 @@
+// Standard
 #include <iostream>
 #include <vector>
-using namespace std;
-
 #include <unistd.h>
 #include <cmath>
-#include "mpi.h"
-#include "omp.h"
+using namespace std;
 
+// Extern
+#include "omp.h"
+#include "mpi.h"
 #include <optparse.hpp>
 
+// Internal headers
 #include "Master.hpp"
 #include "Body.hpp"
+#include "compute/Universe.hpp"
 #include "comm/ClientManager.hpp"
 
 
@@ -50,23 +53,24 @@ int main(int argc, char **argv) {
   fp_t dt = opt.Get("timestep");
   fp_t d = opt.Get("damping");
 
-  std::vector<Body> body(n);
-  std::vector<Vec3> v(n);
-  std::vector<Vec3> a(n);
-
   // Set some initial body positions
+  std::vector<Body> bodies(n);
   for(int i = 0; i < n; i++) {
-    body[i].r.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].r.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].r.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
-    body[i].r = Normalize(body[i].r);
-    body[i].m = 100000;
+    bodies[i].m = 100000;
+    do {
+      bodies[i].r.x = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+      bodies[i].r.y = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+      bodies[i].r.z = ((float)((rand() % 65536) - 32768)) / 32768.0f;
+    } while(Magnitude(bodies[i].r) > 1.0f);
   }
+
+  // Initialise universe from initial body positions
+  Universe universe(bodies);
 
   // Listen for incoming client connections
   ClientManager clients(opt.Get("port"));
 
-  // If custom thread count was supplied, override OMP_NUM_THREADS
+  // If thread count was specified, override OMP_NUM_THREADS
   if(opt.Specified("threadcount")) {
     int threadCount = opt.Get("threadcount");
     omp_set_num_threads(threadCount);
@@ -77,38 +81,8 @@ int main(int argc, char **argv) {
   int iterationLimit = opt.Get("iterationlimit");
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
-
-    // Update clients about simulation progress
-    clients.UpdateBodyData(body);
-
-    // For each body
-    #pragma omp parallel for
-    for(int i = 0; i < n; i++) {
-      a[i].x = a[i].y = a[i].z = 0;
-
-      // Compute acceletation due to other bodies
-      for(int j = 0; j < n; j++) {
-        if((i != j) && (body[j].r != body[i].r)) {
-          Vec3 dr = body[j].r - body[i].r;
-          fp_t r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
-          fp_t acceleration = body[j].m / (r2 + d);
-          fp_t r = sqrt(r2);
-          a[i].x += acceleration * dr.x / r;
-          a[i].y += acceleration * dr.y / r;
-          a[i].z += acceleration * dr.z / r;
-        }
-      }
-
-      // Apply gravitational constant, no need to do this in every iteration
-      a[i] = a[i] * G;
-    }
-
-    // Update body positions and velocities (integration step?)
-    #pragma omp parallel for
-    for(int i = 0; i < n; i++) {
-      body[i].r = body[i].r + (v[i] * dt) + ((a[i] * (dt * dt)) / 2);
-      v[i] = v[i] + (a[i] * dt);
-    }
+    clients.UpdateBodyData(universe.GetBodyData());
+    universe.Iterate(dt, G);
   }
 
   MPI_Finalize();
