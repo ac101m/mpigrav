@@ -18,21 +18,25 @@ ClientManager::ClientManager(int const port) : port(port) {
 
 // Client listener thread
 void ClientManager::ConnectionListenerMain(void) {
-  io_service ioService;
-  ip::tcp::acceptor acceptor(ioService, tcp::endpoint(tcp::v4(), this->port));
+  try {
+    io_service ioService;
+    ip::tcp::acceptor acceptor(ioService, tcp::endpoint(tcp::v4(), this->port));
 
-  std::cout << "Listening for connections on port: " << this->port << "\n";
-  while(1) {
+    std::cout << "Listening for connections on port: " << this->port << "\n";
+    while(1) {
 
-    // Wait for someone to connect
-    std::shared_ptr<tcp::socket> socket(new tcp::socket(ioService));
-    acceptor.accept(*socket);
-    socket->set_option(tcp::no_delay(true));
-    std::cout << "Client connected!\n";
+      // Wait for someone to connect
+      std::shared_ptr<tcp::socket> socket(new tcp::socket(ioService));
+      acceptor.accept(*socket);
+      socket->set_option(tcp::no_delay(true));
+      std::cout << "Client connected!\n";
 
-    // Create a new client thread
-    this->clientThreads.push_back(
-      std::thread(&ClientManager::ClientResponderMain, this, socket));
+      // Create a new client thread
+      this->clientThreads.push_back(
+        std::thread(&ClientManager::ClientResponderMain, this, socket));
+    }
+  } catch(const std::exception& e) {
+    std::cout << "Connection listener error: " << e.what() << "\n";
   }
 }
 
