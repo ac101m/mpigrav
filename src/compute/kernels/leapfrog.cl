@@ -13,25 +13,24 @@ void WriteF3(float3 const f3, __global float* f, int const i) {
 // Simple brute-force kernel with leapfrog integrator
 __kernel void leapfrog(
   // Input buffers
-  __global float const* m,
-  __global float const* r,
-  __global float const* v,
-  __global float const* a,
+  __global float const* m,  // Body mass
+  __global float const* r,  // Position, current
+  __global float const* v,  // Position, current
+  __global float const* a,  // Acceleration, current
   // Output buffers
-  __global float* rNext,
-  __global float* vNext,
-  __global float* aNext,
-  // Control constants
+  __global float* rNext,    // Position, next
+  __global float* vNext,    // Velocity, next
+  __global float* aNext,    // Acceleration, next
+  // Simulation parameters
+  float const dt,           // Time step
+  float const G,            // Gravitational constant
+  float const d,            // Damping factor
+  // Execution control
   int const bodyCount,
   int const domainOffset) {
 
   // Get the index for this kernel
   int i = get_global_id(0) + domainOffset;
-
-  // Simulation parameters, will be passed in properly later
-  float dt = 1E-1;
-  float G = 6.67408E-11;
-  float d = 0.2;
 
   // Reset value of aNext
   float3 aNextInternal = 0;

@@ -143,7 +143,7 @@ unsigned Universe::GetDomainSize(void) {
 
 // Iterate simulation forward one step with given parameters
 // returns the execution time of the iteration
-double Universe::Iterate(fp_t const dt, fp_t const G) {
+double Universe::Iterate(fp_t const dt, fp_t const G, fp_t const d) {
   double tStart = MPI_Wtime();
 
   // Iterate over all bodies
@@ -157,7 +157,7 @@ double Universe::Iterate(fp_t const dt, fp_t const G) {
         Vec3 dr = this->r[j] - this->r[i];
         fp_t r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
         fp_t r = sqrt(r2);
-        fp_t aScalar = this->m[j] / (r2 + 0.2);
+        fp_t aScalar = this->m[j] / (r2 + d);
         this->aNext[i].x += aScalar * dr.x / r;
         this->aNext[i].y += aScalar * dr.y / r;
         this->aNext[i].z += aScalar * dr.z / r;
@@ -213,7 +213,7 @@ void Universe::InitCL(void) {
       vendorCstring = (char*)malloc(sizeof(char)*vendorSize);
       rc = clGetPlatformInfo(
         platformIDs[i], CL_PLATFORM_VENDOR, vendorSize, vendorCstring, NULL);
-      std::cout << "\t[" << i << "] " << vendorCstring << "\n";
+      std::cout << " - [" << i << "] " << vendorCstring << "\n";
     }
   }
 
@@ -236,7 +236,7 @@ void Universe::InitCL(void) {
   if(!MyRank()) {
     std::cout << "Available opencl devices on selected platform:\n";
     for(unsigned i = 0; i < deviceIDs.size(); i++) {
-      std::cout << "\t[" << i << "]\n";
+      std::cout << " - [" << i << "]\n";
     }
   }
 
@@ -343,18 +343,21 @@ void Universe::InitCL(void) {
 
   // Set kernel arguments (misc)
   int domainOffset = this->GetDomainStart();
-  clSetKernelArg(
-    this->clKernel, 7, sizeof(int), (void*)&this->bodyCount);
-  clSetKernelArg(
-    this->clKernel, 8, sizeof(int), (void*)&this->rankBodyOffsets[MyRank()]);
+  clSetKernelArg(this->clKernel, 10, sizeof(int), (void*)&this->bodyCount);
+  clSetKernelArg(this->clKernel, 11, sizeof(int), (void*)&domainOffset);
 }
 
 
 // Opencl iteration kernel
 // returns the execution time of the iteration
-double Universe::IterateCL(fp_t const dt, fp_t const G) {
+double Universe::IterateCL(fp_t const dt, fp_t const G, fp_t const d) {
   double tStart = MPI_Wtime();
   cl_int rc;
+
+  // Set iteration arguments
+  clSetKernelArg(this->clKernel, 7, sizeof(float), (void*)&dt);
+  clSetKernelArg(this->clKernel, 8, sizeof(float), (void*)&G);
+  clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&d);
 
   // Copy inputs to opencl buffers
   clEnqueueWriteBuffer(
