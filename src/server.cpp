@@ -77,6 +77,8 @@ int main(int argc, char **argv) {
     omp_set_num_threads(threadCount);
   }
 
+  if(!MyRank()) std::cout << "\n[COMPUTE BEGINS]\n";
+
   // Limit number of iterations based on command line option
   int iterationCount = 0;
   int iterationLimit = opt.Get("iterationlimit");
@@ -84,9 +86,7 @@ int main(int argc, char **argv) {
     iterationCount++;
     clients.UpdateBodyData(universe.GetBodyData());
     double tIteration = universe.IterateCL(dt, G);
-    if(!MyRank()) {
-      std::cout << "Iteration time: " << tIteration << "s\n";
-    }
+    if(!MyRank()) std::cout << "Iteration time: " << tIteration << "s\n";
   }
 
   MPI_Finalize();

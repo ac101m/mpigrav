@@ -48,8 +48,8 @@ Universe::Universe(std::vector<Body> const& bodyData) {
 
   // Print out discretiation
   if(MyRank() == 0) {
-    std::cout << "[DOMAIN DISCRETISATION]\n";
-    for(unsigned i = 0; i < RankCount(); i++) {
+    std::cout << "\n[DOMAIN DISCRETISATION]\n";
+    for(int i = 0; i < RankCount(); i++) {
       std::cout << "RANK " << i << ", start: " << this->rankBodyOffsets[i];
       std::cout << ", count: " << this->rankBodyCounts[i] << "\n";
     }
@@ -188,27 +188,63 @@ double Universe::Iterate(fp_t const dt, fp_t const G) {
 
 // Initialise opencl, horrible routine, will need to clean up
 void Universe::InitCL(void) {
+  if(!MyRank()) std::cout << "\n[OPENCL INITIALISATION]\n";
   cl_int rc;
 
-  // Get platform and device information
-  this->clPlatformID = NULL;
-  this->clDeviceID = NULL;
-  cl_uint deviceCount, platformCount;
+  // Get information about all platforms
+  cl_uint platformCount;
+  clGetPlatformIDs(0, NULL, &platformCount);
+  std::vector<cl_platform_id> platformIDs(platformCount);
   rc = clGetPlatformIDs(
-    1, &this->clPlatformID, &platformCount);
+    platformCount, platformIDs.data(), &platformCount);
   if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to get platform ID, code: " << rc << "\n";
+    std::cout << "Error, failed to get platform IDs, code: " << rc << "\n";
     exit(1);
   }
 
+  // Print out available platforms
+  if(!MyRank()) {
+    std::cout << "Available opencl platforms:\n";
+    for(unsigned i = 0; i < platformIDs.size(); i++) {
+      size_t vendorSize;
+      char* vendorCstring;
+      rc = clGetPlatformInfo(
+        platformIDs[i], CL_PLATFORM_VENDOR, 1, NULL, &vendorSize);
+      vendorCstring = (char*)malloc(sizeof(char)*vendorSize);
+      rc = clGetPlatformInfo(
+        platformIDs[i], CL_PLATFORM_VENDOR, vendorSize, vendorCstring, NULL);
+      std::cout << "\t[" << i << "] " << vendorCstring << "\n";
+    }
+  }
+
+  // Just use the first platform
+  if(!MyRank()) std::cout << "Selecting platform [0]\n";
+  this->clPlatformID = platformIDs[0];
+
+  // Get IDs for devices on the local platform
+  cl_uint deviceCount;
+  clGetDeviceIDs(this->clPlatformID, CL_DEVICE_TYPE_ALL, 1, NULL, &deviceCount);
+  std::vector<cl_device_id> deviceIDs(deviceCount);
   rc = clGetDeviceIDs(
-    this->clPlatformID, CL_DEVICE_TYPE_DEFAULT, 1, &this->clDeviceID, &deviceCount);
+    this->clPlatformID, CL_DEVICE_TYPE_ALL, deviceCount, deviceIDs.data(), &deviceCount);
   if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to get device ID, code: " << rc << "\n";
+    std::cout << "Error, failed to get device IDs, code: " << rc << "\n";
     exit(1);
   }
 
-  // Create an opencl context and command queue
+  // Print out available devices on this platform
+  if(!MyRank()) {
+    std::cout << "Available opencl devices on selected platform:\n";
+    for(unsigned i = 0; i < deviceIDs.size(); i++) {
+      std::cout << "\t[" << i << "]\n";
+    }
+  }
+
+  // Just use the first device
+  if(!MyRank()) std::cout << "Selecting device [0]\n";
+  this->clDeviceID = deviceIDs[0];
+
+  // Create a context
   this->clContext = clCreateContext(
     NULL, 1, &this->clDeviceID, NULL, NULL, &rc);
   if(rc != CL_SUCCESS) {
@@ -216,6 +252,7 @@ void Universe::InitCL(void) {
     exit(1);
   }
 
+  // Create a command queue
   this->clCommandQueue = clCreateCommandQueue(
     this->clContext, this->clDeviceID, 0, &rc);
   if(rc != CL_SUCCESS) {
@@ -227,7 +264,7 @@ void Universe::InitCL(void) {
   char* source_str;
   FILE* fp = fopen(_MPIGRAV_LEAPGROG_KERNEL_PATH, "r");
   if(!fp) {
-    std::cout << "Error, failed to load kernel source '";
+    std::cout << "Error, failed to open kernel source file '";
     std::cout << "'" << _MPIGRAV_LEAPGROG_KERNEL_PATH << "'\n";
     exit(1);
   }
@@ -237,9 +274,9 @@ void Universe::InitCL(void) {
 
   // Build kernel
   this->clProgram = clCreateProgramWithSource(
-    this->clContext, 1, (const char **)&source_str, (const size_t *)&source_size, &rc);
+    this->clContext, 1, (char const**)&source_str, (size_t const*)&source_size, &rc);
   if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to make cl program, code: " << rc << "\n";
+    std::cout << "Error, failed to make cl program from source, code: " << rc << "\n";
     exit(1);
   }
 
@@ -339,11 +376,16 @@ double Universe::IterateCL(fp_t const dt, fp_t const G) {
 
   // Run the kernel
   size_t globalWorkSize = this->GetDomainSize();
-  size_t localWorkSize = 16;
-  clEnqueueNDRangeKernel(
+  size_t localWorkSize = 32;
+  rc = clEnqueueNDRangeKernel(
     this->clCommandQueue, this->clKernel, 1, NULL,
     &globalWorkSize, &localWorkSize,
     0, NULL, NULL);
+
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to run kernel, code: " << rc << "\n";
+    exit(1);
+  }
 
   // Get outputs from kernel
   clEnqueueReadBuffer(
