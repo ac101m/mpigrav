@@ -3,6 +3,7 @@
 
 // standard
 #include <iostream>
+#include <stdio.h>
 
 
 // External
@@ -15,7 +16,7 @@
 Universe::Universe(std::vector<Body> const& bodyData) {
   this->bodyCount = bodyData.size();
 
-  // Allocate
+  // Allocate integrator term buffers
   this->m = new fp_t[bodyData.size()];
   this->v = new Vec3[bodyData.size()];
   this->r = new Vec3[bodyData.size()];
@@ -24,18 +25,13 @@ Universe::Universe(std::vector<Body> const& bodyData) {
   this->vNext = new Vec3[bodyData.size()];
   this->aNext = new Vec3[bodyData.size()];
 
-  // Initialise
+  // Initialise position and mass
   for(unsigned i = 0; i < bodyData.size(); i++) {
     this->m[i] = bodyData[i].m;
     this->r[i] = bodyData[i].r;
-    this->v[i] = Vec3(0, 0, 0);
-    this->a[i] = Vec3(0, 0, 0);
-    this->rNext[i] = Vec3(0, 0, 0);
-    this->vNext[i] = Vec3(0, 0, 0);
-    this->aNext[i] = Vec3(0, 0, 0);
   }
 
-  // Distribute
+  // Compute domain discretisation
   unsigned localBodyCount;
   unsigned domainOffset = 0;
   unsigned localBodyRemainder = bodyData.size() % RankCount();
@@ -50,7 +46,17 @@ Universe::Universe(std::vector<Body> const& bodyData) {
     domainOffset += localBodyCount;
   }
 
-  std::cout << "My domain " << GetDomainStart() << ", " << GetDomainEnd() << "\n";
+  // Print out discretiation
+  if(MyRank() == 0) {
+    std::cout << "[DOMAIN DISCRETISATION]\n";
+    for(unsigned i = 0; i < RankCount(); i++) {
+      std::cout << "RANK " << i << ", start: " << this->rankBodyOffsets[i];
+      std::cout << ", count: " << this->rankBodyCounts[i] << "\n";
+    }
+  }
+
+  // Initialise opencl stuff
+  this->InitCL();
 }
 
 
@@ -170,6 +176,191 @@ double Universe::Iterate(fp_t const dt, fp_t const G) {
       this->v[i] +
       (((this->a[i] + this->aNext[i]) / 2) * dt);
   }
+
+  // Swap references to next/previous buffers
+  this->SwapBuffers();
+  this->Synchronize();
+
+  double tEnd = MPI_Wtime();
+  return tEnd - tStart;
+}
+
+
+// Initialise opencl, horrible routine, will need to clean up
+void Universe::InitCL(void) {
+  cl_int rc;
+
+  // Get platform and device information
+  this->clPlatformID = NULL;
+  this->clDeviceID = NULL;
+  cl_uint deviceCount, platformCount;
+  rc = clGetPlatformIDs(
+    1, &this->clPlatformID, &platformCount);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to get platform ID, code: " << rc << "\n";
+    exit(1);
+  }
+
+  rc = clGetDeviceIDs(
+    this->clPlatformID, CL_DEVICE_TYPE_DEFAULT, 1, &this->clDeviceID, &deviceCount);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to get device ID, code: " << rc << "\n";
+    exit(1);
+  }
+
+  // Create an opencl context and command queue
+  this->clContext = clCreateContext(
+    NULL, 1, &this->clDeviceID, NULL, NULL, &rc);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to create context ID, code: " << rc << "\n";
+    exit(1);
+  }
+
+  this->clCommandQueue = clCreateCommandQueue(
+    this->clContext, this->clDeviceID, 0, &rc);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to create command queue, code: " << rc << "\n";
+    exit(1);
+  }
+
+  // Load kernel source
+  char* source_str;
+  FILE* fp = fopen(_MPIGRAV_LEAPGROG_KERNEL_PATH, "r");
+  if(!fp) {
+    std::cout << "Error, failed to load kernel source '";
+    std::cout << "'" << _MPIGRAV_LEAPGROG_KERNEL_PATH << "'\n";
+    exit(1);
+  }
+  source_str = (char*)malloc(65536);
+  size_t source_size = fread(source_str, 1, 65536, fp);
+  fclose(fp);
+
+  // Build kernel
+  this->clProgram = clCreateProgramWithSource(
+    this->clContext, 1, (const char **)&source_str, (const size_t *)&source_size, &rc);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to make cl program, code: " << rc << "\n";
+    exit(1);
+  }
+
+  // Build the program
+  rc = clBuildProgram(
+    this->clProgram, 1, &this->clDeviceID, NULL, NULL, NULL);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to build program, code: ";
+    std::cout << rc << "\n";
+
+    size_t logSize;
+    clGetProgramBuildInfo(
+      this->clProgram, this->clDeviceID, CL_PROGRAM_BUILD_LOG, 0, NULL, &logSize);
+    char* buildLog = new char[logSize + 1];
+    clGetProgramBuildInfo(
+      this->clProgram, this->clDeviceID, CL_PROGRAM_BUILD_LOG, logSize, buildLog, NULL);
+    std::cout << buildLog;
+
+    exit(1);
+  }
+
+  this->clKernel = clCreateKernel(
+    this->clProgram, "leapfrog", &rc);
+  if(rc != CL_SUCCESS) {
+    std::cout << "Error, failed to create kernel, code: " << rc << "\n";
+    exit(1);
+  }
+
+  // Create opencl buffers (input)
+  this->clBuf_m = clCreateBuffer(
+    this->clContext, CL_MEM_READ_ONLY,
+    this->bodyCount * sizeof(float), NULL, &rc);
+  this->clBuf_r = clCreateBuffer(
+    this->clContext, CL_MEM_READ_ONLY,
+    this->bodyCount * sizeof(Vec3), NULL, &rc);
+  this->clBuf_v = clCreateBuffer(
+    this->clContext, CL_MEM_READ_ONLY,
+    this->bodyCount * sizeof(Vec3), NULL, &rc);
+  this->clBuf_a = clCreateBuffer(
+    this->clContext, CL_MEM_READ_ONLY,
+    this->bodyCount * sizeof(Vec3), NULL, &rc);
+
+  // Create opencl buffers (output)
+  this->clBuf_rNext = clCreateBuffer(
+    this->clContext, CL_MEM_WRITE_ONLY,
+    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
+  this->clBuf_vNext = clCreateBuffer(
+    this->clContext, CL_MEM_WRITE_ONLY,
+    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
+  this->clBuf_aNext = clCreateBuffer(
+    this->clContext, CL_MEM_WRITE_ONLY,
+    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
+
+  // Set kernel arguments (input)
+  clSetKernelArg(this->clKernel, 0, sizeof(cl_mem), (void*)&this->clBuf_m);
+  clSetKernelArg(this->clKernel, 1, sizeof(cl_mem), (void*)&this->clBuf_r);
+  clSetKernelArg(this->clKernel, 2, sizeof(cl_mem), (void*)&this->clBuf_v);
+  clSetKernelArg(this->clKernel, 3, sizeof(cl_mem), (void*)&this->clBuf_a);
+
+  // Set kernel arguments (output)
+  clSetKernelArg(this->clKernel, 4, sizeof(cl_mem), (void*)&this->clBuf_rNext);
+  clSetKernelArg(this->clKernel, 5, sizeof(cl_mem), (void*)&this->clBuf_vNext);
+  clSetKernelArg(this->clKernel, 6, sizeof(cl_mem), (void*)&this->clBuf_aNext);
+
+  // Set kernel arguments (misc)
+  int domainOffset = this->GetDomainStart();
+  clSetKernelArg(
+    this->clKernel, 7, sizeof(int), (void*)&this->bodyCount);
+  clSetKernelArg(
+    this->clKernel, 8, sizeof(int), (void*)&this->rankBodyOffsets[MyRank()]);
+}
+
+
+// Opencl iteration kernel
+// returns the execution time of the iteration
+double Universe::IterateCL(fp_t const dt, fp_t const G) {
+  double tStart = MPI_Wtime();
+  cl_int rc;
+
+  // Copy inputs to opencl buffers
+  clEnqueueWriteBuffer(
+    this->clCommandQueue, this->clBuf_m, CL_TRUE, 0,
+    this->bodyCount * sizeof(float), this->m,
+    0, NULL, NULL);
+  clEnqueueWriteBuffer(
+    this->clCommandQueue, this->clBuf_r, CL_TRUE, 0,
+    this->bodyCount * sizeof(Vec3), this->r,
+    0, NULL, NULL);
+  clEnqueueWriteBuffer(
+    this->clCommandQueue, this->clBuf_v, CL_TRUE, 0,
+    this->bodyCount * sizeof(Vec3), this->v,
+    0, NULL, NULL);
+  clEnqueueWriteBuffer(
+    this->clCommandQueue, this->clBuf_a, CL_TRUE, 0,
+    this->bodyCount * sizeof(Vec3), this->a,
+    0, NULL, NULL);
+
+  // Run the kernel
+  size_t globalWorkSize = this->GetDomainSize();
+  size_t localWorkSize = 16;
+  clEnqueueNDRangeKernel(
+    this->clCommandQueue, this->clKernel, 1, NULL,
+    &globalWorkSize, &localWorkSize,
+    0, NULL, NULL);
+
+  // Get outputs from kernel
+  clEnqueueReadBuffer(
+    this->clCommandQueue, this->clBuf_rNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(float) * 3,
+    &this->rNext[this->GetDomainStart()],
+    0, NULL, NULL);
+  clEnqueueReadBuffer(
+    this->clCommandQueue, this->clBuf_vNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(float) * 3,
+    &this->vNext[this->GetDomainStart()],
+    0, NULL, NULL);
+  clEnqueueReadBuffer(
+    this->clCommandQueue, this->clBuf_aNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(float) * 3,
+    &this->aNext[this->GetDomainStart()],
+    0, NULL, NULL);
 
   // Swap references to next/previous buffers
   this->SwapBuffers();

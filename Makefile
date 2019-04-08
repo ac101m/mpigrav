@@ -21,7 +21,7 @@ BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
 LD_FLAGS_COMMON ?= -fopenmp -lboost_system -loptparse -lpthread
-LD_FLAGS_SERVER ?= $(LD_FLAGS_COMMON)
+LD_FLAGS_SERVER ?= $(LD_FLAGS_COMMON) -lOpenCL
 LD_FLAGS_CLIENT ?= $(LD_FLAGS_COMMON) -lgltools -lGLEW -lglfw -lGL
 
 # Sources which define main functions
@@ -64,13 +64,13 @@ $(OBJ_DIR_RELEASE_MPI)/%.cpp.o: %.cpp
 
 # Engine release build target
 ENGINE_RELEASE_OBJS := $(SUB_OBJS_RELEASE_MPI) $(OBJ_DIR_RELEASE_MPI)/src/server.cpp.o
-server_release: $(ENGINE_RELEASE_OBJS)
+server_release: move_kernels $(ENGINE_RELEASE_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_RELEASE))
 	$(MPICXX) $(ENGINE_RELEASE_OBJS) -o $(TARGET_ENGINE_RELEASE) $(LD_FLAGS_SERVER)
 
 # Engine debug target
 ENGINE_DEBUG_OBJS := $(SUB_OBJS_DEBUG_MPI) $(OBJ_DIR_DEBUG_MPI)/src/server.cpp.o
-server_debug: $(ENGINE_DEBUG_OBJS)
+server_debug: move_kernels $(ENGINE_DEBUG_OBJS)
 	@$(MKDIR_P) $(dir $(TARGET_ENGINE_DEBUG))
 	$(MPICXX) $(ENGINE_DEBUG_OBJS) -o $(TARGET_ENGINE_DEBUG) $(LD_FLAGS_SERVER)
 
@@ -92,6 +92,13 @@ SHADER_BIN_DIR := bin/shaders
 move_shaders:
 	@$(MKDIR_P) $(SHADER_BIN_DIR)
 	cp $(GLSL_SRCS) $(SHADER_BIN_DIR)
+
+# Simple target, collect opencl kernel sources in the kernels folder
+OCL_SRCS := $(shell find $(SRC_DIRS) -name *.cl)
+KERNEL_BIN_DIR := bin/kernels
+move_kernels:
+	@$(MKDIR_P) $(KERNEL_BIN_DIR)
+	cp $(OCL_SRCS) $(KERNEL_BIN_DIR)
 
 # Make all targets
 release: client_release server_release

@@ -15,6 +15,7 @@ using namespace std;
 #include "Body.hpp"
 #include "compute/Universe.hpp"
 #include "comm/ClientManager.hpp"
+#include "compute/MiscMPI.hpp"
 
 
 void AddOptions(OptionParser& opt) {
@@ -82,7 +83,10 @@ int main(int argc, char **argv) {
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
     clients.UpdateBodyData(universe.GetBodyData());
-    universe.Iterate(dt, G);
+    double tIteration = universe.IterateCL(dt, G);
+    if(!MyRank()) {
+      std::cout << "Iteration time: " << tIteration << "s\n";
+    }
   }
 
   MPI_Finalize();
