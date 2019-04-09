@@ -29,9 +29,9 @@ class Vec3 {
 Vec3 operator+(Vec3 lhs, Vec3 const& rhs);
 Vec3 operator-(Vec3 lhs, Vec3 const& rhs);
 Vec3 operator*(Vec3 lhs, Vec3 const& rhs);
-Vec3 operator*(Vec3 lhs, fp_t const& rhs);
+Vec3 operator*(Vec3 lhs, float const& rhs);
 Vec3 operator/(Vec3 lhs, Vec3 const& rhs);
-Vec3 operator/(Vec3 lhs, fp_t const& rhs);
+Vec3 operator/(Vec3 lhs, float const& rhs);
 
 // Comparison
 bool operator!=(Vec3 const& lhs, Vec3 const& rhs);
@@ -39,7 +39,7 @@ bool operator==(Vec3 const& lhs, Vec3 const& rhs);
 
 // General
 Vec3 Normalize(Vec3 lhs);
-fp_t Magnitude(Vec3 const& lhs);
+float Magnitude(Vec3 const& lhs);
 
 
 #endif // _MPIGRAV_VEC3_INCLUDED

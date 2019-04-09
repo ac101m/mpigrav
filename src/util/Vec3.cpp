@@ -24,7 +24,7 @@ Vec3 operator*(Vec3 lhs, Vec3 const& rhs) {
 }
 
 // Multiplication - single
-Vec3 operator*(Vec3 lhs, fp_t const& rhs) {
+Vec3 operator*(Vec3 lhs, float const& rhs) {
   lhs.x *= rhs; lhs.y *= rhs; lhs.z *= rhs;
   return lhs;
 }
@@ -36,7 +36,7 @@ Vec3 operator/(Vec3 lhs, Vec3 const& rhs) {
 }
 
 // Division - single
-Vec3 operator/(Vec3 lhs, fp_t const& rhs) {
+Vec3 operator/(Vec3 lhs, float const& rhs) {
   lhs.x /= rhs; lhs.y /= rhs; lhs.z /= rhs;
   return lhs;
 }
@@ -58,7 +58,7 @@ bool operator==(Vec3 const& lhs, Vec3 const& rhs) {
 
 // Normalize
 Vec3 Normalize(Vec3 lhs) {
-  fp_t length;
+  float length;
   length = sqrt(lhs.x*lhs.x + lhs.y*lhs.y + lhs.z*lhs.z);
   lhs.x /= length;
   lhs.y /= length;
@@ -68,6 +68,6 @@ Vec3 Normalize(Vec3 lhs) {
 
 
 // Get magnitude of vector
-fp_t Magnitude(Vec3 const& lhs) {
+float Magnitude(Vec3 const& lhs) {
   return sqrt(lhs.x*lhs.x + lhs.y*lhs.y + lhs.z*lhs.z);
 }

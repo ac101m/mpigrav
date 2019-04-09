@@ -11,11 +11,11 @@
 class Body {
   public:
     Vec3 r;   // Position, meters
-    fp_t m;   // Mass, kilograms
+    float m;   // Mass, kilograms
 
   public:
     Body(void) : m(1) {}
-    Body(Vec3 const pos, fp_t const mass) : r(pos), m(mass) {}
+    Body(Vec3 const pos, float const mass) : r(pos), m(mass) {}
 };
 
 

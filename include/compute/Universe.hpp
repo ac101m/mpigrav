@@ -29,7 +29,7 @@ class Universe {
 
     // Integrator term buffers
     unsigned bodyCount;
-    fp_t* m;
+    float* m;
     Vec3* r;
     Vec3* v;
     Vec3* a;
@@ -71,10 +71,10 @@ class Universe {
 
     // Iterate simulation forward one step with given parameters
     // returns the execution time of the iteration
-    double Iterate(fp_t const dt, fp_t const G, fp_t const d);
+    double Iterate(float const dt, float const G, float const d);
 
     // OpenCL iterate method (woo speedy)
-    double IterateCL(fp_t const dt, fp_t const G, fp_t const d);
+    double IterateCL(float const dt, float const G, float const d);
 
     // Gets content of the universe as vector of body classes
     std::vector<Body> GetBodyData(void);

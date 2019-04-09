@@ -50,9 +50,9 @@ int main(int argc, char **argv) {
   AddOptions(opt);
 
   int n = opt.Get("nbodies");
-  fp_t G = opt.Get("gravitation");
-  fp_t dt = opt.Get("timestep");
-  fp_t d = opt.Get("damping");
+  float G = opt.Get("gravitation");
+  float dt = opt.Get("timestep");
+  float d = opt.Get("damping");
 
   // Set some initial body positions
   std::vector<Body> bodies(n);

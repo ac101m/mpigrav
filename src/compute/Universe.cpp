@@ -17,7 +17,7 @@ Universe::Universe(std::vector<Body> const& bodyData) {
   this->bodyCount = bodyData.size();
 
   // Allocate integrator term buffers
-  this->m = new fp_t[bodyData.size()];
+  this->m = new float[bodyData.size()];
   this->v = new Vec3[bodyData.size()];
   this->r = new Vec3[bodyData.size()];
   this->a = new Vec3[bodyData.size()];
@@ -143,7 +143,7 @@ unsigned Universe::GetDomainSize(void) {
 
 // Iterate simulation forward one step with given parameters
 // returns the execution time of the iteration
-double Universe::Iterate(fp_t const dt, fp_t const G, fp_t const d) {
+double Universe::Iterate(float const dt, float const G, float const d) {
   double tStart = MPI_Wtime();
 
   // Iterate over all bodies
@@ -155,9 +155,9 @@ double Universe::Iterate(fp_t const dt, fp_t const G, fp_t const d) {
     for(unsigned j = 0; j < this->bodyCount; j++) {
       if((i != j) && (this->r[i] != this->r[j])) {
         Vec3 dr = this->r[j] - this->r[i];
-        fp_t r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
-        fp_t r = sqrt(r2);
-        fp_t aScalar = this->m[j] / (r2 + d);
+        float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
+        float r = sqrt(r2);
+        float aScalar = this->m[j] / (r2 + d);
         this->aNext[i].x += aScalar * dr.x / r;
         this->aNext[i].y += aScalar * dr.y / r;
         this->aNext[i].z += aScalar * dr.z / r;
@@ -350,7 +350,7 @@ void Universe::InitCL(void) {
 
 // Opencl iteration kernel
 // returns the execution time of the iteration
-double Universe::IterateCL(fp_t const dt, fp_t const G, fp_t const d) {
+double Universe::IterateCL(float const dt, float const G, float const d) {
   double tStart = MPI_Wtime();
   cl_int rc;
 
@@ -379,7 +379,7 @@ double Universe::IterateCL(fp_t const dt, fp_t const G, fp_t const d) {
 
   // Run the kernel
   size_t globalWorkSize = this->GetDomainSize();
-  size_t localWorkSize = 32;
+  size_t localWorkSize = 16;
   rc = clEnqueueNDRangeKernel(
     this->clCommandQueue, this->clKernel, 1, NULL,
     &globalWorkSize, &localWorkSize,
