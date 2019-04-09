@@ -10,6 +10,23 @@ void WriteF3(float3 const f3, __global float* f, int const i) {
 }
 
 
+float3 BodyBodyAcceleration(
+  float3 ri, float3 rj,   // Positions
+  float mi, float mj,     // Masses
+  float e2, float3 ai) {
+
+  float3 r = rj - ri;
+  float r2 = r.x * r.x + r.y * r.y + r.z * r.z + e2;
+  float r6 = r2 * r2 * r2;
+  float r3inv = 1.0f / sqrt(r6);
+  float s = mj * r3inv;
+  ai.x += r.x * s;
+  ai.y += r.y * s;
+  ai.z += r.z * s;
+  return ai;
+}
+
+
 // Simple brute-force kernel with leapfrog integrator
 __kernel void leapfrog(
   // Input buffers
@@ -37,15 +54,8 @@ __kernel void leapfrog(
 
   // Compute acceleration due to other bodies
   for(int j = 0; j < bodyCount; j++) {
-    if(i != j) {
-      float3 dr = ReadF3(r, j) - ReadF3(r, i);
-      float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
-      float r = sqrt(r2);
-      float aScalar = m[j] / (r2 + e2);
-      aNextInternal.x += aScalar * dr.x / r;
-      aNextInternal.y += aScalar * dr.y / r;
-      aNextInternal.z += aScalar * dr.z / r;
-    }
+    aNextInternal = BodyBodyAcceleration(
+      ReadF3(r, i), ReadF3(r, j), m[i], m[j], e2, aNextInternal);
   }
 
   // Apply universal gravitational constant
