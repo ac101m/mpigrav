@@ -71,10 +71,10 @@ class Universe {
 
     // Iterate simulation forward one step with given parameters
     // returns the execution time of the iteration
-    double Iterate(float const dt, float const G, float const d);
+    double Iterate(float const dt, float const G, float const e);
 
     // OpenCL iterate method (woo speedy)
-    double IterateCL(float const dt, float const G, float const d);
+    double IterateCL(float const dt, float const G, float const e);
 
     // Gets content of the universe as vector of body classes
     std::vector<Body> GetBodyData(void);

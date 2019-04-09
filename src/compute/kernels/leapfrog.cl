@@ -24,7 +24,7 @@ __kernel void leapfrog(
   // Simulation parameters
   float const dt,           // Time step
   float const G,            // Gravitational constant
-  float const d,            // Damping factor
+  float const e2,           // Damping factor
   // Execution control
   int const bodyCount,
   int const domainOffset) {
@@ -41,7 +41,7 @@ __kernel void leapfrog(
       float3 dr = ReadF3(r, j) - ReadF3(r, i);
       float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
       float r = sqrt(r2);
-      float aScalar = m[j] / (r2 + d);
+      float aScalar = m[j] / (r2 + e2);
       aNextInternal.x += aScalar * dr.x / r;
       aNextInternal.y += aScalar * dr.y / r;
       aNextInternal.z += aScalar * dr.z / r;

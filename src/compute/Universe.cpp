@@ -143,8 +143,9 @@ unsigned Universe::GetDomainSize(void) {
 
 // Iterate simulation forward one step with given parameters
 // returns the execution time of the iteration
-double Universe::Iterate(float const dt, float const G, float const d) {
+double Universe::Iterate(float const dt, float const G, float const e) {
   double tStart = MPI_Wtime();
+  float e2 = e * e;
 
   // Iterate over all bodies
   #pragma omp parallel for
@@ -157,7 +158,7 @@ double Universe::Iterate(float const dt, float const G, float const d) {
         Vec3 dr = this->r[j] - this->r[i];
         float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
         float r = sqrt(r2);
-        float aScalar = this->m[j] / (r2 + d);
+        float aScalar = this->m[j] / (r2 + e2);
         this->aNext[i].x += aScalar * dr.x / r;
         this->aNext[i].y += aScalar * dr.y / r;
         this->aNext[i].z += aScalar * dr.z / r;
@@ -350,14 +351,14 @@ void Universe::InitCL(void) {
 
 // Opencl iteration kernel
 // returns the execution time of the iteration
-double Universe::IterateCL(float const dt, float const G, float const d) {
+double Universe::IterateCL(float const dt, float const G, float const e) {
   double tStart = MPI_Wtime();
-  cl_int rc;
+  float e2 = e * e;
 
   // Set iteration arguments
   clSetKernelArg(this->clKernel, 7, sizeof(float), (void*)&dt);
   clSetKernelArg(this->clKernel, 8, sizeof(float), (void*)&G);
-  clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&d);
+  clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&e2);
 
   // Copy inputs to opencl buffers
   clEnqueueWriteBuffer(
@@ -380,7 +381,7 @@ double Universe::IterateCL(float const dt, float const G, float const d) {
   // Run the kernel
   size_t globalWorkSize = this->GetDomainSize();
   size_t localWorkSize = 16;
-  rc = clEnqueueNDRangeKernel(
+  cl_int rc = clEnqueueNDRangeKernel(
     this->clCommandQueue, this->clKernel, 1, NULL,
     &globalWorkSize, &localWorkSize,
     0, NULL, NULL);
