@@ -71,7 +71,7 @@ class Universe {
 
     // Iterate simulation forward one step with given parameters
     // returns the execution time of the iteration
-    double Iterate(float const dt, float const G, float const e);
+    double Iterate(float const dt, float const G, float const e2);
 
     // OpenCL iterate method (woo speedy)
     double IterateCL(float const dt, float const G, float const e);

@@ -48,9 +48,9 @@ Universe::Universe(std::vector<Body> const& bodyData) {
 
   // Print out discretiation
   if(MyRank() == 0) {
-    std::cout << "\n[DOMAIN DISCRETISATION]\n";
+    std::cout << "\n[WORK DISTRIBUTION]\n";
     for(int i = 0; i < RankCount(); i++) {
-      std::cout << "RANK " << i << ", start: " << this->rankBodyOffsets[i];
+      std::cout << "Process " << i << ") offset: " << this->rankBodyOffsets[i];
       std::cout << ", count: " << this->rankBodyCounts[i] << "\n";
     }
   }

@@ -49,12 +49,42 @@ int main(int argc, char **argv) {
   OptionParser opt(argc, argv, "mpigrav compute server");
   AddOptions(opt);
 
+  // If thread count was specified, override OMP_NUM_THREADS
+  int threadCount = opt.Get("threadcount");
+  int commPort = opt.Get("port");
+
+  if(!MyRank()) {
+    std::cout << "\n[SYSTEM PARAMETERS]\n";
+    std::cout << "Communication port: " << commPort << "\n";
+    std::cout << "Thread count: ";
+    if(!opt.Specified("threadcount")) std::cout << "OMP_NUM_THREADS\n";
+    else std::cout << threadCount << "\n";
+  }
+
   int n = opt.Get("nbodies");
   float G = opt.Get("gravitation");
   float dt = opt.Get("timestep");
   float d = opt.Get("damping");
+  int iterationLimit = opt.Get("iterationlimit");
+
+  if(!MyRank()) {
+    std::cout << "\n[ALGORITHM PARAMETERS]\n";
+    std::cout << "Body count: " << n << "\n";
+    std::cout << "Gravitation: " << G << "\n";
+    std::cout << "Timestep: " << dt << "\n";
+    std::cout << "Damping factor: " << d << "\n";
+    std::cout << "Iteration limit: ";
+    if(!iterationLimit) std::cout << "None\n";
+    else std::cout << iterationLimit << "\n";
+  }
+
+  if(!MyRank()) std::cout << "\n[INITIAL CONFIGURATION]\n";
+  if(opt.Specified("threadcount")) {
+    omp_set_num_threads(threadCount);
+  }
 
   // Set some initial body positions
+  if(!MyRank()) std::cout << "Initialising body positions\n";
   std::vector<Body> bodies(n);
   for(int i = 0; i < n; i++) {
     bodies[i].m = 100000;
@@ -69,19 +99,12 @@ int main(int argc, char **argv) {
   Universe universe(bodies);
 
   // Listen for incoming client connections
-  ClientManager clients(opt.Get("port"));
+  ClientManager clients(commPort);
 
-  // If thread count was specified, override OMP_NUM_THREADS
-  if(opt.Specified("threadcount")) {
-    int threadCount = opt.Get("threadcount");
-    omp_set_num_threads(threadCount);
-  }
-
-  if(!MyRank()) std::cout << "\n[COMPUTE BEGINS]\n";
+  if(!MyRank()) std::cout << "\n[SIMULATION BEGINS]\n";
 
   // Limit number of iterations based on command line option
   int iterationCount = 0;
-  int iterationLimit = opt.Get("iterationlimit");
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
     clients.UpdateBodyData(universe.GetBodyData());
