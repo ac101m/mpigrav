@@ -13,7 +13,10 @@
 
 
 // Constructs a universe from vector of bodies
-Universe::Universe(std::vector<Body> const& bodyData) {
+Universe::Universe(
+  std::vector<Body> const& bodyData,
+  float const G, float const dt, float const e) {
+
   this->bodyCount = bodyData.size();
 
   // Allocate integrator term buffers
@@ -31,7 +34,7 @@ Universe::Universe(std::vector<Body> const& bodyData) {
     this->r[i] = bodyData[i].r;
   }
 
-  // Compute domain discretisation
+  // Compute work assignments
   unsigned localBodyCount;
   unsigned domainOffset = 0;
   unsigned localBodyRemainder = bodyData.size() % RankCount();
@@ -46,7 +49,7 @@ Universe::Universe(std::vector<Body> const& bodyData) {
     domainOffset += localBodyCount;
   }
 
-  // Print out discretiation
+  // Print out work assignments
   if(MyRank() == 0) {
     std::cout << "\n[WORK DISTRIBUTION]\n";
     for(int i = 0; i < RankCount(); i++) {
@@ -56,140 +59,22 @@ Universe::Universe(std::vector<Body> const& bodyData) {
   }
 
   // Initialise opencl stuff
-  this->InitCL();
-}
-
-
-// Free integrator term buffers
-Universe::~Universe(void) {
-  delete [] this->m;
-  delete [] this->r;
-  delete [] this->v;
-  delete [] this->a;
-  delete [] this->rNext;
-  delete [] this->vNext;
-  delete [] this->aNext;
-}
-
-
-// Swap buffer references
-void Universe::SwapBuffers(void) {
-  Vec3* tmp;
-  tmp = this->r; this->r = this->rNext; this->rNext = tmp;
-  tmp = this->v; this->v = this->vNext; this->vNext = tmp;
-  tmp = this->a; this->a = this->aNext; this->aNext = tmp;
-}
-
-
-// Synchronize buffers between processes
-void Universe::Synchronize(void) {
-  if(RankCount() == 1) return;
-
-  std::vector<int> rankByteCounts(rankBodyCounts.size());
-  std::vector<int> rankByteOffsets(rankBodyOffsets.size());
-
-  for(unsigned i = 0; i < rankByteCounts.size(); i++) {
-    rankByteCounts[i] = this->rankBodyCounts[i] * sizeof(Vec3);
-    rankByteOffsets[i] = this->rankBodyOffsets[i] * sizeof(Vec3);
+  try {
+    this->InitCL();
+  } catch (cl::Error err) {
+    std::cout << err.what() << "(" << err.err() << ")" << std::endl;
+    exit(1);
   }
 
-  // Synchronize positions
-  MPI_Allgatherv(
-    &this->r[this->GetDomainStart()],
-    this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->r,
-    rankByteCounts.data(),
-    rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
-
-  // Synchronize velocity
-  MPI_Allgatherv(
-    &this->v[this->GetDomainStart()],
-    this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->v,
-    rankByteCounts.data(),
-    rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
-
-  // Synchronize acceleration
-  MPI_Allgatherv(
-    &this->a[this->GetDomainStart()],
-    this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->a,
-    rankByteCounts.data(),
-    rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
-}
-
-
-unsigned Universe::GetDomainStart(void) {
-  return this->rankBodyOffsets[MyRank()];
-}
-
-unsigned Universe::GetDomainEnd(void) {
-  return this->rankBodyOffsets[MyRank()] + this->rankBodyCounts[MyRank()];
-}
-
-unsigned Universe::GetDomainSize(void) {
-  return this->rankBodyCounts[MyRank()];
-}
-
-
-// Iterate simulation forward one step with given parameters
-// returns the execution time of the iteration
-double Universe::Iterate(float const dt, float const G, float const e) {
-  double tStart = MPI_Wtime();
-  float e2 = e * e;
-
-  // Iterate over all bodies
-  #pragma omp parallel for
-  for(unsigned i = this->GetDomainStart(); i < this->GetDomainEnd(); i++) {
-    this->aNext[i] = Vec3(0, 0, 0);
-
-    // Compute acceleration due to other bodies
-    for(unsigned j = 0; j < this->bodyCount; j++) {
-      if((i != j) && (this->r[i] != this->r[j])) {
-        Vec3 dr = this->r[j] - this->r[i];
-        float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
-        float r = sqrt(r2);
-        float aScalar = this->m[j] / (r2 + e2);
-        this->aNext[i].x += aScalar * dr.x / r;
-        this->aNext[i].y += aScalar * dr.y / r;
-        this->aNext[i].z += aScalar * dr.z / r;
-      }
-    }
-    this->aNext[i] = this->aNext[i] * G;
-
-    // Compute next position
-    this->rNext[i] =
-      this->r[i] +
-      (this->v[i] * dt) +
-      ((this->a[i] * (dt * dt)) / 2);
-
-    // Compute next velocity
-    this->vNext[i] =
-      this->v[i] +
-      (((this->a[i] + this->aNext[i]) / 2) * dt);
-  }
-
-  // Swap references to next/previous buffers
-  this->SwapBuffers();
-  this->Synchronize();
-
-  double tEnd = MPI_Wtime();
-  return tEnd - tStart;
+  this->SetGravitationalConstant(G);
+  this->SetTimestepSize(dt);
+  this->SetSofteningFactor(e);
 }
 
 
 // Initialise opencl, horrible routine, will need to clean up
 void Universe::InitCL(void) {
-  if(!MyRank()) std::cout << "\n[OPENCL INITIALISATION]\n";
+  if(!MyRank()) std::cout << "\n[WORK DISTRIBUTION]\n";
   cl_int rc;
 
   // Get information about all platforms
@@ -205,7 +90,7 @@ void Universe::InitCL(void) {
 
   // Print out available platforms
   if(!MyRank()) {
-    std::cout << "Available opencl platforms:\n";
+    std::cout << "Detected OpenCL platforms:\n";
     for(unsigned i = 0; i < platformIDs.size(); i++) {
       size_t vendorSize;
       char* vendorCstring;
@@ -214,7 +99,7 @@ void Universe::InitCL(void) {
       vendorCstring = (char*)malloc(sizeof(char)*vendorSize);
       rc = clGetPlatformInfo(
         platformIDs[i], CL_PLATFORM_VENDOR, vendorSize, vendorCstring, NULL);
-      std::cout << " - [" << i << "] " << vendorCstring << "\n";
+      std::cout << "[" << i << "] " << vendorCstring << "\n";
     }
   }
 
@@ -349,16 +234,104 @@ void Universe::InitCL(void) {
 }
 
 
+// Swap buffer references
+void Universe::SwapBuffers(void) {
+  Vec3* tmp;
+  tmp = this->r; this->r = this->rNext; this->rNext = tmp;
+  tmp = this->v; this->v = this->vNext; this->vNext = tmp;
+  tmp = this->a; this->a = this->aNext; this->aNext = tmp;
+}
+
+
+// Synchronize buffers between processes
+void Universe::Synchronize(void) {
+  if(RankCount() == 1) return;
+
+  std::vector<int> rankByteCounts(rankBodyCounts.size());
+  std::vector<int> rankByteOffsets(rankBodyOffsets.size());
+
+  for(unsigned i = 0; i < rankByteCounts.size(); i++) {
+    rankByteCounts[i] = this->rankBodyCounts[i] * sizeof(Vec3);
+    rankByteOffsets[i] = this->rankBodyOffsets[i] * sizeof(Vec3);
+  }
+
+  // Synchronize positions
+  MPI_Allgatherv(
+    &this->r[this->GetDomainStart()],
+    this->GetDomainSize() * sizeof(Vec3),
+    MPI_BYTE,
+    this->r,
+    rankByteCounts.data(),
+    rankByteOffsets.data(),
+    MPI_BYTE,
+    MPI_COMM_WORLD);
+
+  // Synchronize velocity
+  MPI_Allgatherv(
+    &this->v[this->GetDomainStart()],
+    this->GetDomainSize() * sizeof(Vec3),
+    MPI_BYTE,
+    this->v,
+    rankByteCounts.data(),
+    rankByteOffsets.data(),
+    MPI_BYTE,
+    MPI_COMM_WORLD);
+
+  // Synchronize acceleration
+  MPI_Allgatherv(
+    &this->a[this->GetDomainStart()],
+    this->GetDomainSize() * sizeof(Vec3),
+    MPI_BYTE,
+    this->a,
+    rankByteCounts.data(),
+    rankByteOffsets.data(),
+    MPI_BYTE,
+    MPI_COMM_WORLD);
+}
+
+
+unsigned Universe::GetDomainStart(void) {
+  return this->rankBodyOffsets[MyRank()];
+}
+
+unsigned Universe::GetDomainEnd(void) {
+  return this->rankBodyOffsets[MyRank()] + this->rankBodyCounts[MyRank()];
+}
+
+unsigned Universe::GetDomainSize(void) {
+  return this->rankBodyCounts[MyRank()];
+}
+
+
+void Universe::SetGravitationalConstant(float const G) {
+  if(G != this->G) {
+    clSetKernelArg(this->clKernel, 8, sizeof(float), (void*)&G);
+    this->G = G;
+  }
+}
+
+
+void Universe::SetTimestepSize(float const dt) {
+  if(dt != this->dt) {
+    clSetKernelArg(this->clKernel, 7, sizeof(float), (void*)&dt);
+    this->dt = dt;
+  }
+}
+
+
+void Universe::SetSofteningFactor(float const e) {
+  if(e != this->e) {
+    this->e = e;
+    float e2 = e * e;
+    clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&e2);
+  }
+}
+
+
 // Opencl iteration kernel
 // returns the execution time of the iteration
-double Universe::IterateCL(float const dt, float const G, float const e) {
+double Universe::IterateCL(void) {
   double tStart = MPI_Wtime();
-  float e2 = e * e;
-
-  // Set iteration arguments
-  clSetKernelArg(this->clKernel, 7, sizeof(float), (void*)&dt);
-  clSetKernelArg(this->clKernel, 8, sizeof(float), (void*)&G);
-  clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&e2);
 
   // Copy inputs to opencl buffers
   clEnqueueWriteBuffer(
@@ -386,11 +359,6 @@ double Universe::IterateCL(float const dt, float const G, float const e) {
     &globalWorkSize, &localWorkSize,
     0, NULL, NULL);
 
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to run kernel, code: " << rc << "\n";
-    exit(1);
-  }
-
   // Get outputs from kernel
   clEnqueueReadBuffer(
     this->clCommandQueue, this->clBuf_rNext, CL_TRUE, 0,
@@ -417,6 +385,52 @@ double Universe::IterateCL(float const dt, float const G, float const e) {
 }
 
 
+// Iterate simulation forward one step with given parameters
+// returns the execution time of the iteration
+double Universe::Iterate(void) {
+  double tStart = MPI_Wtime();
+  float e2 = this->e * this->e;
+
+  // Iterate over all bodies
+  #pragma omp parallel for
+  for(unsigned i = this->GetDomainStart(); i < this->GetDomainEnd(); i++) {
+    this->aNext[i] = Vec3(0, 0, 0);
+
+    // Compute acceleration due to other bodies
+    for(unsigned j = 0; j < this->bodyCount; j++) {
+      if((i != j) && (this->r[i] != this->r[j])) {
+        Vec3 dr = this->r[j] - this->r[i];
+        float r2 = (dr.x * dr.x) + (dr.y * dr.y) + (dr.z * dr.z);
+        float r = sqrt(r2);
+        float aScalar = this->m[j] / (r2 + e2);
+        this->aNext[i].x += aScalar * dr.x / r;
+        this->aNext[i].y += aScalar * dr.y / r;
+        this->aNext[i].z += aScalar * dr.z / r;
+      }
+    }
+    this->aNext[i] = this->aNext[i] * this->G;
+
+    // Compute next position
+    this->rNext[i] =
+      this->r[i] +
+      (this->v[i] * this->dt) +
+      ((this->a[i] * (this->dt * this->dt)) / 2);
+
+    // Compute next velocity
+    this->vNext[i] =
+      this->v[i] +
+      (((this->a[i] + this->aNext[i]) / 2) * this->dt);
+  }
+
+  // Swap references to next/previous buffers
+  this->SwapBuffers();
+  this->Synchronize();
+
+  double tEnd = MPI_Wtime();
+  return tEnd - tStart;
+}
+
+
 // Get a vector of body data from the universe
 std::vector<Body> Universe::GetBodyData(void) {
   std::vector<Body> bodyData(this->bodyCount);
@@ -425,4 +439,16 @@ std::vector<Body> Universe::GetBodyData(void) {
     bodyData[i].r = this->r[i];
   }
   return bodyData;
+}
+
+
+// Free integrator term buffers
+Universe::~Universe(void) {
+  delete [] this->m;
+  delete [] this->r;
+  delete [] this->v;
+  delete [] this->a;
+  delete [] this->rNext;
+  delete [] this->vNext;
+  delete [] this->aNext;
 }

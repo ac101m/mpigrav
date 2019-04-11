@@ -8,7 +8,8 @@
 
 // External
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
-#include <CL/cl.h>
+#define __CL_ENABLE_EXCEPTIONS
+#include <CL/cl.hpp>
 
 
 // Internal
@@ -26,6 +27,11 @@ class Universe {
     // Which bodies this instance is responsible for
     std::vector<unsigned> rankBodyCounts;
     std::vector<unsigned> rankBodyOffsets;
+
+    // Simulation parameters
+    float G;
+    float dt;
+    float e;
 
     // Integrator term buffers
     unsigned bodyCount;
@@ -66,18 +72,23 @@ class Universe {
     unsigned GetDomainSize(void);
 
   public:
-    Universe(std::vector<Body> const& bodyData);
-    ~Universe(void);
+    Universe(
+      std::vector<Body> const& bodyData,
+      float const G, float const dt, float const e);
 
-    // Iterate simulation forward one step with given parameters
-    // returns the execution time of the iteration
-    double Iterate(float const dt, float const G, float const e2);
-
-    // OpenCL iterate method (woo speedy)
-    double IterateCL(float const dt, float const G, float const e);
+    // Iteration routines
+    double Iterate(void);     // Slow cpu code
+    double IterateCL(void);   // Opencl kernel, woo, speedy
 
     // Gets content of the universe as vector of body classes
     std::vector<Body> GetBodyData(void);
+
+    // Sets for various simulation parameters
+    void SetGravitationalConstant(float G);
+    void SetTimestepSize(float dt);
+    void SetSofteningFactor(float e);
+
+    ~Universe(void);
 };
 
 

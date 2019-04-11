@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
   }
 
   // Initialise universe from initial body positions
-  Universe universe(bodies);
+  Universe universe(bodies, G, dt, d);
 
   // Listen for incoming client connections
   ClientManager clients(commPort);
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
     clients.UpdateBodyData(universe.GetBodyData());
-    double tIteration = universe.IterateCL(dt, G, d);
+    double tIteration = universe.IterateCL();
     if(!MyRank()) std::cout << "Iteration time: " << tIteration << "s\n";
   }
 
