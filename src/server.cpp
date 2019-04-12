@@ -108,7 +108,13 @@ int main(int argc, char **argv) {
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
     clients.UpdateBodyData(universe.GetBodyData());
-    double tIteration = universe.IterateCL();
+    double tIteration;
+    try {
+      tIteration = universe.IterateCL();
+    } catch(cl::Error err) {
+      std::cout << err.what() << "(" << err.err() << ")\n";
+      exit(1);
+    }
     if(!MyRank()) std::cout << "Iteration time: " << tIteration << "s\n";
   }
 

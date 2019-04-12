@@ -7,7 +7,6 @@
 
 
 // External
-#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
@@ -44,21 +43,19 @@ class Universe {
     Vec3* aNext;
 
     // OpenCL handles
-    cl_platform_id clPlatformID;
-    cl_device_id clDeviceID;
-    cl_context clContext;
-    cl_command_queue clCommandQueue;
-    cl_program clProgram;
-    cl_kernel clKernel;
+    cl::Context clContext;
+    cl::CommandQueue clCommandQueue;
+    cl::Program clProgram;
+    cl::Kernel clKernel;
 
     // OpenCL buffers
-    cl_mem clBuf_m;
-    cl_mem clBuf_r;
-    cl_mem clBuf_v;
-    cl_mem clBuf_a;
-    cl_mem clBuf_rNext;
-    cl_mem clBuf_vNext;
-    cl_mem clBuf_aNext;
+    cl::Buffer clBuf_m;
+    cl::Buffer clBuf_r;
+    cl::Buffer clBuf_v;
+    cl::Buffer clBuf_a;
+    cl::Buffer clBuf_rNext;
+    cl::Buffer clBuf_vNext;
+    cl::Buffer clBuf_aNext;
 
 //====[METHODS]==============================================================//
 

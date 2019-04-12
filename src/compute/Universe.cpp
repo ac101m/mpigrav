@@ -3,7 +3,8 @@
 
 // standard
 #include <iostream>
-#include <stdio.h>
+#include <fstream>
+#include <string>
 
 
 // External
@@ -62,7 +63,7 @@ Universe::Universe(
   try {
     this->InitCL();
   } catch (cl::Error err) {
-    std::cout << err.what() << "(" << err.err() << ")" << std::endl;
+    std::cout << err.what() << "(" << err.err() << ")\n";
     exit(1);
   }
 
@@ -74,163 +75,76 @@ Universe::Universe(
 
 // Initialise opencl, horrible routine, will need to clean up
 void Universe::InitCL(void) {
-  if(!MyRank()) std::cout << "\n[WORK DISTRIBUTION]\n";
-  cl_int rc;
+  if(!MyRank()) std::cout << "\n[OPENCL INITIALISATION]\n";
 
-  // Get information about all platforms
-  cl_uint platformCount;
-  clGetPlatformIDs(0, NULL, &platformCount);
-  std::vector<cl_platform_id> platformIDs(platformCount);
-  rc = clGetPlatformIDs(
-    platformCount, platformIDs.data(), &platformCount);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to get platform IDs, code: " << rc << "\n";
-    exit(1);
-  }
+  // Get list of platforms
+  std::vector<cl::Platform> clPlatforms;
+  cl::Platform::get(&clPlatforms);
 
-  // Print out available platforms
-  if(!MyRank()) {
-    std::cout << "Detected OpenCL platforms:\n";
-    for(unsigned i = 0; i < platformIDs.size(); i++) {
-      size_t vendorSize;
-      char* vendorCstring;
-      rc = clGetPlatformInfo(
-        platformIDs[i], CL_PLATFORM_VENDOR, 1, NULL, &vendorSize);
-      vendorCstring = (char*)malloc(sizeof(char)*vendorSize);
-      rc = clGetPlatformInfo(
-        platformIDs[i], CL_PLATFORM_VENDOR, vendorSize, vendorCstring, NULL);
-      std::cout << "[" << i << "] " << vendorCstring << "\n";
-    }
-  }
+  // SELECT PLATFORM HERE
 
-  // Just use the first platform
-  if(!MyRank()) std::cout << "Selecting platform [0]\n";
-  this->clPlatformID = platformIDs[0];
+  // Create an opencl context
+  //cl_context_properties cps[3] = {
+  //  CL_CONTEXT_PLATFORM, (cl_context_properties)(clPlatforms[0]), 0};
+  this->clContext = cl::Context(CL_DEVICE_TYPE_CPU);
 
-  // Get IDs for devices on the local platform
-  cl_uint deviceCount;
-  clGetDeviceIDs(this->clPlatformID, CL_DEVICE_TYPE_ALL, 1, NULL, &deviceCount);
-  std::vector<cl_device_id> deviceIDs(deviceCount);
-  rc = clGetDeviceIDs(
-    this->clPlatformID, CL_DEVICE_TYPE_ALL, deviceCount, deviceIDs.data(), &deviceCount);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to get device IDs, code: " << rc << "\n";
-    exit(1);
-  }
+  // Get all devices within this context
+  std::vector<cl::Device> clDevices =
+    this->clContext.getInfo<CL_CONTEXT_DEVICES>();
 
-  // Print out available devices on this platform
-  if(!MyRank()) {
-    std::cout << "Available opencl devices on selected platform:\n";
-    for(unsigned i = 0; i < deviceIDs.size(); i++) {
-      std::cout << " - [" << i << "]\n";
-    }
-  }
-
-  // Just use the first device
-  if(!MyRank()) std::cout << "Selecting device [0]\n";
-  this->clDeviceID = deviceIDs[0];
-
-  // Create a context
-  this->clContext = clCreateContext(
-    NULL, 1, &this->clDeviceID, NULL, NULL, &rc);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to create context ID, code: " << rc << "\n";
-    exit(1);
-  }
+  // SELECT DEVICE HERE
 
   // Create a command queue
-  this->clCommandQueue = clCreateCommandQueue(
-    this->clContext, this->clDeviceID, 0, &rc);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to create command queue, code: " << rc << "\n";
-    exit(1);
-  }
+  this->clCommandQueue = cl::CommandQueue(this->clContext, clDevices[0]);
 
   // Load kernel source
-  char* source_str;
-  FILE* fp = fopen(_MPIGRAV_LEAPGROG_KERNEL_PATH, "r");
-  if(!fp) {
-    std::cout << "Error, failed to open kernel source file '";
-    std::cout << "'" << _MPIGRAV_LEAPGROG_KERNEL_PATH << "'\n";
-    exit(1);
-  }
-  source_str = (char*)malloc(65536);
-  size_t source_size = fread(source_str, 1, 65536, fp);
-  fclose(fp);
+  std::ifstream fp("kernels/leapfrog.cl");
+  std::string srcString(
+    (std::istreambuf_iterator<char>(fp)),
+    (std::istreambuf_iterator<char>()));
+  cl::Program::Sources source(
+    1, std::make_pair(srcString.c_str(), srcString.length() + 1));
 
-  // Build kernel
-  this->clProgram = clCreateProgramWithSource(
-    this->clContext, 1, (char const**)&source_str, (size_t const*)&source_size, &rc);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to make cl program from source, code: " << rc << "\n";
-    exit(1);
-  }
+  // Make context-local program from source & build for devices
+  this->clProgram = cl::Program(this->clContext, source);
+  this->clProgram.build(clDevices);
 
-  // Build the program
-  rc = clBuildProgram(
-    this->clProgram, 1, &this->clDeviceID, NULL, NULL, NULL);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to build program, code: ";
-    std::cout << rc << "\n";
-
-    size_t logSize;
-    clGetProgramBuildInfo(
-      this->clProgram, this->clDeviceID, CL_PROGRAM_BUILD_LOG, 0, NULL, &logSize);
-    char* buildLog = new char[logSize + 1];
-    clGetProgramBuildInfo(
-      this->clProgram, this->clDeviceID, CL_PROGRAM_BUILD_LOG, logSize, buildLog, NULL);
-    std::cout << buildLog;
-
-    exit(1);
-  }
-
-  this->clKernel = clCreateKernel(
-    this->clProgram, "leapfrog", &rc);
-  if(rc != CL_SUCCESS) {
-    std::cout << "Error, failed to create kernel, code: " << rc << "\n";
-    exit(1);
-  }
+  // Build the kernel
+  this->clKernel = cl::Kernel(this->clProgram, "leapfrog");
 
   // Create opencl buffers (input)
-  this->clBuf_m = clCreateBuffer(
-    this->clContext, CL_MEM_READ_ONLY,
-    this->bodyCount * sizeof(float), NULL, &rc);
-  this->clBuf_r = clCreateBuffer(
-    this->clContext, CL_MEM_READ_ONLY,
-    this->bodyCount * sizeof(Vec3), NULL, &rc);
-  this->clBuf_v = clCreateBuffer(
-    this->clContext, CL_MEM_READ_ONLY,
-    this->bodyCount * sizeof(Vec3), NULL, &rc);
-  this->clBuf_a = clCreateBuffer(
-    this->clContext, CL_MEM_READ_ONLY,
-    this->bodyCount * sizeof(Vec3), NULL, &rc);
+  this->clBuf_m = cl::Buffer(
+    this->clContext, CL_MEM_READ_ONLY, this->bodyCount * sizeof(float));
+  this->clBuf_r = cl::Buffer(
+    this->clContext, CL_MEM_READ_ONLY, this->bodyCount * sizeof(Vec3));
+  this->clBuf_v = cl::Buffer(
+    this->clContext, CL_MEM_READ_ONLY, this->bodyCount * sizeof(Vec3));
+  this->clBuf_a = cl::Buffer(
+    this->clContext, CL_MEM_READ_ONLY, this->bodyCount * sizeof(Vec3));
 
   // Create opencl buffers (output)
-  this->clBuf_rNext = clCreateBuffer(
-    this->clContext, CL_MEM_WRITE_ONLY,
-    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
-  this->clBuf_vNext = clCreateBuffer(
-    this->clContext, CL_MEM_WRITE_ONLY,
-    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
-  this->clBuf_aNext = clCreateBuffer(
-    this->clContext, CL_MEM_WRITE_ONLY,
-    this->GetDomainSize() * sizeof(Vec3), NULL, &rc);
+  this->clBuf_rNext = cl::Buffer(
+    this->clContext, CL_MEM_WRITE_ONLY, this->GetDomainSize() * sizeof(Vec3));
+  this->clBuf_vNext = cl::Buffer(
+    this->clContext, CL_MEM_WRITE_ONLY, this->GetDomainSize() * sizeof(Vec3));
+  this->clBuf_aNext = cl::Buffer(
+    this->clContext, CL_MEM_WRITE_ONLY, this->GetDomainSize() * sizeof(Vec3));
 
   // Set kernel arguments (input)
-  clSetKernelArg(this->clKernel, 0, sizeof(cl_mem), (void*)&this->clBuf_m);
-  clSetKernelArg(this->clKernel, 1, sizeof(cl_mem), (void*)&this->clBuf_r);
-  clSetKernelArg(this->clKernel, 2, sizeof(cl_mem), (void*)&this->clBuf_v);
-  clSetKernelArg(this->clKernel, 3, sizeof(cl_mem), (void*)&this->clBuf_a);
+  this->clKernel.setArg(0, this->clBuf_m);
+  this->clKernel.setArg(1, this->clBuf_r);
+  this->clKernel.setArg(2, this->clBuf_v);
+  this->clKernel.setArg(3, this->clBuf_a);
 
   // Set kernel arguments (output)
-  clSetKernelArg(this->clKernel, 4, sizeof(cl_mem), (void*)&this->clBuf_rNext);
-  clSetKernelArg(this->clKernel, 5, sizeof(cl_mem), (void*)&this->clBuf_vNext);
-  clSetKernelArg(this->clKernel, 6, sizeof(cl_mem), (void*)&this->clBuf_aNext);
+  this->clKernel.setArg(4, this->clBuf_rNext);
+  this->clKernel.setArg(5, this->clBuf_vNext);
+  this->clKernel.setArg(6, this->clBuf_aNext);
 
   // Set kernel arguments (misc)
   int domainOffset = this->GetDomainStart();
-  clSetKernelArg(this->clKernel, 10, sizeof(int), (void*)&this->bodyCount);
-  clSetKernelArg(this->clKernel, 11, sizeof(int), (void*)&domainOffset);
+  this->clKernel.setArg(10, this->bodyCount);
+  this->clKernel.setArg(11, domainOffset);
 }
 
 
@@ -259,34 +173,28 @@ void Universe::Synchronize(void) {
   MPI_Allgatherv(
     &this->r[this->GetDomainStart()],
     this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->r,
+    MPI_BYTE, this->r,
     rankByteCounts.data(),
     rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
+    MPI_BYTE, MPI_COMM_WORLD);
 
   // Synchronize velocity
   MPI_Allgatherv(
     &this->v[this->GetDomainStart()],
     this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->v,
+    MPI_BYTE, this->v,
     rankByteCounts.data(),
     rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
+    MPI_BYTE, MPI_COMM_WORLD);
 
   // Synchronize acceleration
   MPI_Allgatherv(
     &this->a[this->GetDomainStart()],
     this->GetDomainSize() * sizeof(Vec3),
-    MPI_BYTE,
-    this->a,
+    MPI_BYTE, this->a,
     rankByteCounts.data(),
     rankByteOffsets.data(),
-    MPI_BYTE,
-    MPI_COMM_WORLD);
+    MPI_BYTE, MPI_COMM_WORLD);
 }
 
 
@@ -305,16 +213,16 @@ unsigned Universe::GetDomainSize(void) {
 
 void Universe::SetGravitationalConstant(float const G) {
   if(G != this->G) {
-    clSetKernelArg(this->clKernel, 8, sizeof(float), (void*)&G);
     this->G = G;
+    this->clKernel.setArg(8, G);
   }
 }
 
 
 void Universe::SetTimestepSize(float const dt) {
   if(dt != this->dt) {
-    clSetKernelArg(this->clKernel, 7, sizeof(float), (void*)&dt);
     this->dt = dt;
+    this->clKernel.setArg(7, dt);
   }
 }
 
@@ -323,7 +231,7 @@ void Universe::SetSofteningFactor(float const e) {
   if(e != this->e) {
     this->e = e;
     float e2 = e * e;
-    clSetKernelArg(this->clKernel, 9, sizeof(float), (void*)&e2);
+    this->clKernel.setArg(9, e2);
   }
 }
 
@@ -334,47 +242,34 @@ double Universe::IterateCL(void) {
   double tStart = MPI_Wtime();
 
   // Copy inputs to opencl buffers
-  clEnqueueWriteBuffer(
-    this->clCommandQueue, this->clBuf_m, CL_TRUE, 0,
-    this->bodyCount * sizeof(float), this->m,
-    0, NULL, NULL);
-  clEnqueueWriteBuffer(
-    this->clCommandQueue, this->clBuf_r, CL_TRUE, 0,
-    this->bodyCount * sizeof(Vec3), this->r,
-    0, NULL, NULL);
-  clEnqueueWriteBuffer(
-    this->clCommandQueue, this->clBuf_v, CL_TRUE, 0,
-    this->bodyCount * sizeof(Vec3), this->v,
-    0, NULL, NULL);
-  clEnqueueWriteBuffer(
-    this->clCommandQueue, this->clBuf_a, CL_TRUE, 0,
-    this->bodyCount * sizeof(Vec3), this->a,
-    0, NULL, NULL);
+  this->clCommandQueue.enqueueWriteBuffer(
+    this->clBuf_m, CL_TRUE, 0, this->bodyCount * sizeof(float), this->m);
+  this->clCommandQueue.enqueueWriteBuffer(
+    this->clBuf_r, CL_TRUE, 0, this->bodyCount * sizeof(Vec3), this->r);
+  this->clCommandQueue.enqueueWriteBuffer(
+    this->clBuf_v, CL_TRUE, 0, this->bodyCount * sizeof(Vec3), this->v);
+  this->clCommandQueue.enqueueWriteBuffer(
+    this->clBuf_a, CL_TRUE, 0, this->bodyCount * sizeof(Vec3), this->a);
 
   // Run the kernel
-  size_t globalWorkSize = this->GetDomainSize();
-  size_t localWorkSize = 16;
-  cl_int rc = clEnqueueNDRangeKernel(
-    this->clCommandQueue, this->clKernel, 1, NULL,
-    &globalWorkSize, &localWorkSize,
-    0, NULL, NULL);
+  cl::NDRange globalWork = this->GetDomainSize();
+  cl::NDRange localWork = 16;
+  this->clCommandQueue.enqueueNDRangeKernel(
+    this->clKernel, cl::NullRange, globalWork, localWork);
 
   // Get outputs from kernel
-  clEnqueueReadBuffer(
-    this->clCommandQueue, this->clBuf_rNext, CL_TRUE, 0,
-    this->GetDomainSize() * sizeof(float) * 3,
-    &this->rNext[this->GetDomainStart()],
-    0, NULL, NULL);
-  clEnqueueReadBuffer(
-    this->clCommandQueue, this->clBuf_vNext, CL_TRUE, 0,
-    this->GetDomainSize() * sizeof(float) * 3,
-    &this->vNext[this->GetDomainStart()],
-    0, NULL, NULL);
-  clEnqueueReadBuffer(
-    this->clCommandQueue, this->clBuf_aNext, CL_TRUE, 0,
-    this->GetDomainSize() * sizeof(float) * 3,
-    &this->aNext[this->GetDomainStart()],
-    0, NULL, NULL);
+  this->clCommandQueue.enqueueReadBuffer(
+    this->clBuf_rNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(Vec3),
+    &this->rNext[this->GetDomainStart()]);
+  this->clCommandQueue.enqueueReadBuffer(
+    this->clBuf_vNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(Vec3),
+    &this->vNext[this->GetDomainStart()]);
+  this->clCommandQueue.enqueueReadBuffer(
+    this->clBuf_aNext, CL_TRUE, 0,
+    this->GetDomainSize() * sizeof(Vec3),
+    &this->aNext[this->GetDomainStart()]);
 
   // Swap references to next/previous buffers
   this->SwapBuffers();
