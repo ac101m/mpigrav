@@ -99,11 +99,9 @@ void Universe::InitCL(void) {
 
   // Load kernel source
   std::ifstream fp("kernels/leapfrog.cl");
-  std::string srcString(
+  std::string source(
     (std::istreambuf_iterator<char>(fp)),
     (std::istreambuf_iterator<char>()));
-  cl::Program::Sources source(
-    1, std::make_pair(srcString.c_str(), srcString.length() + 1));
 
   // Make context-local program from source & build for devices
   this->clProgram = cl::Program(this->clContext, source);
@@ -253,7 +251,7 @@ double Universe::IterateCL(void) {
 
   // Run the kernel
   cl::NDRange globalWork = this->GetDomainSize();
-  cl::NDRange localWork = 16;
+  cl::NDRange localWork = 4;
   this->clCommandQueue.enqueueNDRangeKernel(
     this->clKernel, cl::NullRange, globalWork, localWork);
 
