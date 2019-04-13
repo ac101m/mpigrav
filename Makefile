@@ -20,7 +20,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 BASE_FLAGS ?= -MMD -MP -m64 -fopenmp -std=c++11 -Wall
 DEBUG_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -g
 RELEASE_FLAGS ?= $(INC_FLAGS) $(BASE_FLAGS) -O3
-LD_FLAGS_COMMON ?= -fopenmp -lboost_system -loptparse -lpthread
+LD_FLAGS_COMMON ?= -fopenmp -l:libboost_system.a -loptparse -lpthread
 LD_FLAGS_SERVER ?= $(LD_FLAGS_COMMON) -lOpenCL
 LD_FLAGS_CLIENT ?= $(LD_FLAGS_COMMON) -lgltools -lGLEW -lglfw -lGL
 
