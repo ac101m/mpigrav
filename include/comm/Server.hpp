@@ -1,28 +1,45 @@
 #ifndef _MPIGRAV_SERVER_INDLUDED
 #define _MPIGRAV_SERVER_INDLUDED
 
-#include <string>
+#include <vector>
+#include <mutex>
+#include <thread>
+#include <memory>
 
 #include <boost/asio.hpp>
 
-#include "Body.hpp"
-#include "comm/Request.hpp"
+#include <comm/Request.hpp>
+#include <Body.hpp>
 
 
 class Server {
   private:
-    boost::asio::io_service ioService;
-    boost::asio::ip::tcp::socket socket;
+    int port;
 
     std::vector<Body> bodies;
+    std::mutex bodyDataMutex;
+    bool updateRequired;
 
-//=====[PRIVATE METHODS]=====================================================//
+    std::thread connectionListenerThread;
+    std::vector<std::thread> clientThreads;
 
-    void SendRequest(request_t request);
+//====[PRIVATE METHODS]======================================================//
+
+    // Connnection listener thread
+    void ConnectionListenerMain(void);
+
+    // Client reponder thread, handles requests from clients
+    void ClientResponderMain(std::shared_ptr<boost::asio::ip::tcp::socket> socket);
+    request_t GetClientRequest(std::shared_ptr<boost::asio::ip::tcp::socket>& socket);
+    void SendInt(std::shared_ptr<boost::asio::ip::tcp::socket>& socket, int i);
+    void SendBodyData(std::shared_ptr<boost::asio::ip::tcp::socket>& socket);
 
   public:
-    Server(std::string const host, int const port);
-    std::vector<Body> GetBodyData(void);
+    Server(int const port);
+    void Start(void);
+
+    void UpdateBodyData(std::vector<Body> const& bodies);
+    bool UpdateRequired(void) {return this->updateRequired;}
 };
 
 

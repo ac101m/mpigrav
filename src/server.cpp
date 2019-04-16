@@ -14,7 +14,7 @@ using namespace std;
 #include "Master.hpp"
 #include "Body.hpp"
 #include "compute/Universe.hpp"
-#include "comm/ClientManager.hpp"
+#include "comm/Server.hpp"
 #include "compute/MiscMPI.hpp"
 
 
@@ -98,8 +98,9 @@ int main(int argc, char **argv) {
   // Initialise universe from initial body positions
   Universe universe(bodies, G, dt, d);
 
-  // Listen for incoming client connections
-  ClientManager clients(commPort);
+  // Listen for incoming client connections (only on rank 0)
+  Server server(commPort);
+  if(!MyRank()) server.Start();
 
   if(!MyRank()) std::cout << "\n[SIMULATION BEGINS]\n";
 
@@ -107,7 +108,7 @@ int main(int argc, char **argv) {
   int iterationCount = 0;
   while(!iterationLimit || iterationCount < iterationLimit) {
     iterationCount++;
-    clients.UpdateBodyData(universe.GetBodyData());
+    server.UpdateBodyData(universe.GetBodyData());
     double tIteration;
     try {
       tIteration = universe.IterateCL();
