@@ -1,18 +1,17 @@
+// Standard
 #include <iostream>
 #include <string>
 #include <sstream>
 
-#include <unistd.h>
-
+// External
 #include <GLT/Window.hpp>
 #include <GLT/Mesh.hpp>
 #include <optparse.hpp>
 
+// Internal
 #include "Master.hpp"
-#include "comm/Server.hpp"
+#include "comm/Client.hpp"
 #include "draw/Draw.hpp"
-
-#include <unistd.h>
 
 
 void AddOptions(OptionParser& opt) {
@@ -32,7 +31,7 @@ int main(int argc, char **argv) {
   // Connect to the server
   std::string address = opt.Get("address");
   int port = opt.Get("port");
-  Server server(address, port);
+  Client client(address, port);
 
   // Set up a window for drawing
   std::stringstream ss;
@@ -85,7 +84,7 @@ int main(int argc, char **argv) {
 
 
     // Get body data and draw
-    std::vector<Body> bodies = server.GetBodyData();
+    std::vector<Body> bodies = client.GetBodyData();
     GLT::Mesh bodyMesh = MakeMeshFromBodyList(bodies);
     glm::mat4 m = glm::mat4(1.0f);
     window.Draw(bodyMesh, bodyShader, m);

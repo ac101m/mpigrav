@@ -2,11 +2,13 @@
 #define _MPIGRAV_CLIENT_INDLUDED
 
 #include <string>
+#include <thread>
+#include <mutex>
 
 #include <boost/asio.hpp>
 
 #include "Body.hpp"
-#include "comm/Request.hpp"
+#include "comm/Signal.hpp"
 
 
 class Client {
@@ -14,11 +16,19 @@ class Client {
     boost::asio::io_service ioService;
     boost::asio::ip::tcp::socket socket;
 
-    std::vector<Body> bodies;
+    std::thread signalListenerThread;
+    bool done;
+
+    std::vector<Body> bodyData;
+    std::mutex bodyDataMutex;
 
 //=====[PRIVATE METHODS]=====================================================//
 
-    void SendRequest(request_t request);
+    // Internal listener thread functions
+    void SignalListenerMain(void);
+    signal_t RecvSignal(void);
+    int RecvInt(void);
+    void RecvBodyData(void);
 
   public:
     Client(std::string const host, int const port);

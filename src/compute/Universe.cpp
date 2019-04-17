@@ -251,7 +251,7 @@ double Universe::IterateCL(void) {
 
   // Run the kernel
   cl::NDRange globalWork = this->GetDomainSize();
-  cl::NDRange localWork = 4;
+  cl::NDRange localWork = 2;
   this->clCommandQueue.enqueueNDRangeKernel(
     this->clKernel, cl::NullRange, globalWork, localWork);
 

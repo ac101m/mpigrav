@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <chrono>
 
 using namespace boost::asio;
 using ip::tcp;
@@ -9,16 +10,26 @@ using ip::tcp;
 #include <Body.hpp>
 
 
-// Constructor, starts listening on port
-Server::Server(int const port) {
-  this->port = port;
+Server::Server(std::vector<Body> const& bodyData) {
+  this->bodyDataMutex.lock();
+  this->bodyData = bodyData;
+  this->bodyDataMutex.unlock();
+  this->done = false;
 }
 
 
-// Start the server thread
-void Server::Start(void) {
+// Start the server
+void Server::Start(int const port, double const updateFrequency) {
+  this->port = port;
+  this->updateFrequency = updateFrequency;
+
+  // Connection listener thread
   this->connectionListenerThread =
     std::thread(&Server::ConnectionListenerMain, this);
+
+  // Transmit thread
+  this->clientUpdateThread =
+    std::thread(&Server::ClientUpdateMain, this);
 }
 
 
@@ -29,7 +40,7 @@ void Server::ConnectionListenerMain(void) {
     ip::tcp::acceptor acceptor(ioService, tcp::endpoint(tcp::v4(), this->port));
 
     std::cout << "Listening for connections on port: " << this->port << "\n";
-    while(1) {
+    while(!this->done) {
 
       // Wait for someone to connect
       std::shared_ptr<tcp::socket> socket(new tcp::socket(ioService));
@@ -38,8 +49,9 @@ void Server::ConnectionListenerMain(void) {
       std::cout << "Client connected!\n";
 
       // Create a new client thread
-      this->clientThreads.push_back(
-        std::thread(&Server::ClientResponderMain, this, socket));
+      this->socketListMutex.lock();
+      this->sockets.push_back(socket);
+      this->socketListMutex.unlock();
     }
   } catch(const std::exception& e) {
     std::cout << "Connection listener error: " << e.what() << "\n";
@@ -47,59 +59,68 @@ void Server::ConnectionListenerMain(void) {
 }
 
 
-// Client responder main
-void Server::ClientResponderMain(std::shared_ptr<tcp::socket> socket) {
-  try {
-    while(1) {
-      switch(this->GetClientRequest(socket)) {
-        case REQUEST_BODY_DATA:
-          if(this->updateRequired) {
-            this->SendBodyData(socket);
-            this->updateRequired = false;
-          } else {
-            this->SendInt(socket, 0);
-          }
-          break;
-        default:
-          std::cout << "Warning, unrecognised request ignored\n";
-          break;
-      }
-    }
-  } catch(const std::exception& e) {
-    std::cout << "Client disconnected: " << e.what() << "\n";
-  }
+void Server::SendSignal(
+  std::shared_ptr<ip::tcp::socket> socket,
+  signal_t sig) {
+
+  write(*socket, buffer(&sig, sizeof(signal_t)));
 }
 
 
-request_t Server::GetClientRequest(std::shared_ptr<tcp::socket>& socket) {
-  request_t request;
-  read(*socket, buffer(&request, sizeof(request_t)));
-  return request;
-}
+void Server::SendInt(
+  std::shared_ptr<boost::asio::ip::tcp::socket> socket,
+  int i) {
 
-
-void Server::SendInt(std::shared_ptr<tcp::socket>& socket, int i) {
   write(*socket, buffer(&i, sizeof(int)));
 }
 
 
-void Server::SendBodyData(std::shared_ptr<tcp::socket>& socket) {
+void Server::SendBodyData(
+  std::shared_ptr<ip::tcp::socket> socket,
+  std::vector<Body> const& buf) {
 
-  // Create intermediate buffer so compute doesn't stall during transmission
-  this->bodyDataMutex.lock();
-  std::vector<Body> buf = this->bodies;
-  this->bodyDataMutex.unlock();
-
-  // Transmit body data
+  this->SendSignal(socket, SIGNAL_TRANSMIT_BODY_DATA);
   this->SendInt(socket, buf.size());
   write(*socket, buffer(buf.data(), buf.size() * sizeof(Body)));
 }
 
 
-// Update internal body buffer
-void Server::UpdateBodyData(std::vector<Body> const& bodies) {
+// Update connected clients, return true on success
+void Server::UpdateClients(std::vector<Body> const& buf) {
+  this->socketListMutex.lock();
+  auto i = this->sockets.cbegin();
+  while(i != this->sockets.cend()) {
+    try {
+      this->SendBodyData(*i, buf);
+      i++;
+    } catch(std::exception& e) {
+      std::cout << "Client socket error, disconnecting\n";
+      this->sockets.erase(i++);
+    }
+  }
+  this->socketListMutex.unlock();
+}
+
+
+void Server::ClientUpdateMain(void) {
+  using namespace std::chrono;
+  while(!this->done) {
+    high_resolution_clock::time_point tStart = high_resolution_clock::now();
+
+    this->bodyDataMutex.lock();
+    std::vector<Body> buf = this->bodyData;
+    this->bodyDataMutex.unlock();
+    this->UpdateClients(buf);
+
+    std::this_thread::sleep_until(
+      duration<double>(1 / this->updateFrequency) + tStart);
+  }
+}
+
+
+// Set data to send to clients
+void Server::SetBodyData(std::vector<Body> const& bodyData) {
   this->bodyDataMutex.lock();
-  this->bodies = bodies;
+  this->bodyData = bodyData;
   this->bodyDataMutex.unlock();
-  this->updateRequired = true;
 }

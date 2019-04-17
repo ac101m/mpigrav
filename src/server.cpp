@@ -1,16 +1,14 @@
 // Standard
 #include <iostream>
 #include <vector>
-#include <unistd.h>
 #include <cmath>
-using namespace std;
 
-// Extern
+// External
 #include "omp.h"
 #include "mpi.h"
 #include <optparse.hpp>
 
-// Internal headers
+// Internal
 #include "Master.hpp"
 #include "Body.hpp"
 #include "compute/Universe.hpp"
@@ -40,6 +38,9 @@ void AddOptions(OptionParser& opt) {
   opt.Add(Option("iterationlimit", 'i', ARG_TYPE_INT,
                  "Limits the number of iterations to perform 0 = infinite",
                  {"0"}));
+  opt.Add(Option("updaterate", 'u', ARG_TYPE_INT,
+                 "How often the server should try to update connected clients",
+                 {"10"}));
 }
 
 
@@ -50,11 +51,13 @@ int main(int argc, char **argv) {
   AddOptions(opt);
 
   // If thread count was specified, override OMP_NUM_THREADS
+  int clientUpdateFrequency = opt.Get("updaterate");
   int threadCount = opt.Get("threadcount");
   int commPort = opt.Get("port");
 
   if(!MyRank()) {
     std::cout << "\n[SYSTEM PARAMETERS]\n";
+    std::cout << "Client update rate: " << clientUpdateFrequency << "\n";
     std::cout << "Communication port: " << commPort << "\n";
     std::cout << "Thread count: ";
     if(!opt.Specified("threadcount")) std::cout << "OMP_NUM_THREADS\n";
@@ -99,16 +102,18 @@ int main(int argc, char **argv) {
   Universe universe(bodies, G, dt, d);
 
   // Listen for incoming client connections (only on rank 0)
-  Server server(commPort);
-  if(!MyRank()) server.Start();
+  Server server(bodies);
+  if(!MyRank()) server.Start(commPort, clientUpdateFrequency);
 
   if(!MyRank()) std::cout << "\n[SIMULATION BEGINS]\n";
 
   // Limit number of iterations based on command line option
-  int iterationCount = 0;
-  while(!iterationLimit || iterationCount < iterationLimit) {
-    iterationCount++;
-    server.UpdateBodyData(universe.GetBodyData());
+  for(int i = 0; i < iterationLimit || !iterationLimit; i++) {
+
+    // Update server body data
+    server.SetBodyData(universe.GetBodyData());
+
+    // Perform the iteration
     double tIteration;
     try {
       tIteration = universe.IterateCL();
@@ -116,7 +121,11 @@ int main(int argc, char **argv) {
       std::cout << err.what() << "(" << err.err() << ")\n";
       exit(1);
     }
-    if(!MyRank()) std::cout << "Iteration time: " << tIteration << "s\n";
+
+    // Print out the iteration time
+    if(!MyRank()) {
+      std::cout << "Iteration " << i << ") time: " << tIteration << "s\n";
+    }
   }
 
   MPI_Finalize();
