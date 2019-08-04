@@ -27,7 +27,7 @@ GLT::Mesh MakeMeshFromBodyList(std::vector<Body> const& bodies) {
 // Override the mesh draw routine
 void GLT::Mesh::Draw(Camera& camera, ShaderProgram& shader, glm::mat4& m) {
   glm::mat4 mvp = camera.GetProjMat() * camera.GetViewMat() * m;
-  shader.GetUniform("mvpMx").SetFMat4(mvp);
+  shader.GetUniform("mvpMx").SetFMat4(&mvp);
   this->vertexBuffer.Bind();
   glDrawElements(
     GL_POINTS,

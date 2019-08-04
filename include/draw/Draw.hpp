@@ -2,7 +2,7 @@
 #define _MPIGRAV_DRAW_INCLUDED
 
 #include <GLT/Mesh.hpp>
-#include <GLT/Shader.hpp>
+#include <GLT/GL/Shader.hpp>
 
 #include "Body.hpp"
 
