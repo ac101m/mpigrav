@@ -18,7 +18,7 @@
 
 
 // Kernel paths
-#define _MPIGRAV_LEAPGROG_KERNEL_PATH "kernels/leapfrog.cl"
+#define MPIGRAV_LEAPGROG_KERNEL_PATH "kernels/leapfrog.cl"
 
 
 class Universe {
