@@ -31,7 +31,7 @@ void AddOptions(OptionParser& opt) {
                  {"1"}));
   opt.Add(Option("port", 'p', ARG_TYPE_INT,
                  "Port to listen for clients on",
-                 {_MPIGRAV_DEFAULT_PORT}));
+                 {MPIGRAV_DEFAULT_PORT}));
   opt.Add(Option("threadcount", 't', ARG_TYPE_INT,
                  "Number of threads to use for each instance",
                  {"1"}));

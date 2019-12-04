@@ -3,7 +3,7 @@
 
 
 // Default port
-#define _MPIGRAV_DEFAULT_PORT "9147"
+#define MPIGRAV_DEFAULT_PORT "9147"
 
 
 #endif // _MPIGRAV_MASTER_INCLUDED
