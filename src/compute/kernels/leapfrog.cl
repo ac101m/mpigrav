@@ -32,7 +32,7 @@ __kernel void leapfrog(
   // Input buffers
   __global float const* m,  // Body mass
   __global float const* r,  // Position, current
-  __global float const* v,  // Position, current
+  __global float const* v,  // Velocity, current
   __global float const* a,  // Acceleration, current
   // Output buffers
   __global float* rNext,    // Position, next
