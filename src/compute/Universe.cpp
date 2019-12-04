@@ -86,7 +86,7 @@ void Universe::InitCL(void) {
   // Create an opencl context
   //cl_context_properties cps[3] = {
   //  CL_CONTEXT_PLATFORM, (cl_context_properties)(clPlatforms[0]), 0};
-  this->clContext = cl::Context(CL_DEVICE_TYPE_CPU);
+  this->clContext = cl::Context(CL_DEVICE_TYPE_GPU);
 
   // Get all devices within this context
   std::vector<cl::Device> clDevices =
