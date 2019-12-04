@@ -98,7 +98,7 @@ void Universe::InitCL(void) {
   this->clCommandQueue = cl::CommandQueue(this->clContext, clDevices[0]);
 
   // Load kernel source
-  std::ifstream fp("kernels/leapfrog.cl");
+  std::ifstream fp(MPIGRAV_LEAPGROG_KERNEL_PATH);
   std::string source(
     (std::istreambuf_iterator<char>(fp)),
     (std::istreambuf_iterator<char>()));
